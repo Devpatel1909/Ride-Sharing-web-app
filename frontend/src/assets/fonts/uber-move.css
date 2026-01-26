@@ -1,0 +1,25 @@
+/* UberMove font loader
+   Place the actual .woff2 files in this folder with the filenames below.
+   Example filenames: UberMove-Regular.woff2, UberMoveText-Regular.woff2
+*/
+
+@font-face {
+  font-family: 'UberMove';
+  src: url('./UberMove-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'UberMoveText';
+  src: url('./UberMoveText-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* export a CSS variable if needed */
+:root {
+  --font-ubermove: 'UberMove', 'UberMoveText', system-ui, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}

@@ -1,0 +1,8 @@
+/* Load local fonts first (place files in src/assets/fonts/) */
+@import './assets/fonts/uber-move.css';
+
+@tailwind base;
+@tailwind utilities;
+
+/* minimal fallback */
+body { margin: 0; }
