@@ -1,25 +1,21 @@
-/* UberMove font loader
-   Place the actual .woff2 files in this folder with the filenames below.
-   Example filenames: UberMove-Regular.woff2, UberMoveText-Regular.woff2
+/* Placeholder Uber Move font stylesheet
+   This file prevents Vite/Tailwind build errors when the real font files
+   are not present. Replace with the real font-face declarations as needed.
 */
 
 @font-face {
   font-family: 'UberMove';
-  src: url('./UberMove-Regular.woff2') format('woff2');
+  /* Fallback to a system font if the true font files are missing */
+  src: local('Segoe UI'), local('Roboto'), local('Arial');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 
-@font-face {
-  font-family: 'UberMoveText';
-  src: url('./UberMoveText-Regular.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-/* export a CSS variable if needed */
 :root {
-  --font-ubermove: 'UberMove', 'UberMoveText', system-ui, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --uber-font: 'UberMove', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+}
+
+html, body {
+  font-family: var(--uber-font);
 }
