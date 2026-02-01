@@ -23,13 +23,15 @@ export default function RiderAuth() {
   const handleLogin = (e) => {
     e.preventDefault();
     console.log("Login:", { loginEmail, loginPassword, rememberMe });
-    navigate("/dashboard", { replace: true });
+    localStorage.setItem("isLoggedIn", "true");
+    navigate("/ride-search", { replace: true });
   };
 
   const handleSignup = (e) => {
     e.preventDefault();
     console.log("Signup:", { signupName, signupEmail, signupPhone, signupPassword });
-    navigate("/dashboard", { replace: true });
+    localStorage.setItem("isLoggedIn", "true");
+    navigate("/ride-search", { replace: true });
   };
 
   return (
