@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Eye, EyeOff, ArrowRight, Mail, Lock, User, Phone } from "lucide-react";
+import React, { useState, useRef } from "react";
+import { Eye, EyeOff, ArrowRight, Mail, Lock, User, Phone, Camera, Car, CreditCard, Palette, Users } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 
 export default function RiderAuth() {
@@ -13,12 +13,40 @@ export default function RiderAuth() {
   const [rememberMe, setRememberMe] = useState(false);
 
   // Signup state
-  const [signupName, setSignupName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPhone, setSignupPhone] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [showSignupPassword, setShowSignupPassword] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
+  
+  // Profile photo state
+  const [profilePhoto, setProfilePhoto] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState(null);
+  const fileInputRef = useRef(null);
+  
+  // License state
+  const [licenseNumber, setLicenseNumber] = useState("");
+  
+  // Vehicle state
+  const [vehiclePlate, setVehiclePlate] = useState("");
+  const [vehicleColor, setVehicleColor] = useState("");
+  const [vehicleCapacity, setVehicleCapacity] = useState("");
+  const [vehicleType, setVehicleType] = useState("");
+  const [vehicleModel, setVehicleModel] = useState("");
+
+  const handlePhotoChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setProfilePhoto(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoPreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -29,7 +57,23 @@ export default function RiderAuth() {
 
   const handleSignup = (e) => {
     e.preventDefault();
-    console.log("Signup:", { signupName, signupEmail, signupPhone, signupPassword });
+    const formData = {
+      firstName,
+      lastName,
+      email: signupEmail,
+      phone: signupPhone,
+      password: signupPassword,
+      profilePhoto,
+      licenseNumber,
+      vehicle: {
+        plate: vehiclePlate,
+        color: vehicleColor,
+        capacity: vehicleCapacity,
+        type: vehicleType,
+        model: vehicleModel,
+      },
+    };
+    console.log("Signup:", formData);
     localStorage.setItem("isLoggedIn", "true");
     navigate("/ride-search", { replace: true });
   };
@@ -37,8 +81,8 @@ export default function RiderAuth() {
   return (
     <div className="flex min-h-screen bg-white">
       {/* Left Side - Form */}
-      <div className="flex items-center justify-center w-full p-8 lg:w-1/2">
-        <div className="w-full max-w-md">
+      <div className="flex items-start justify-center w-full p-8 overflow-y-auto lg:w-1/2">
+        <div className="w-full max-w-md py-8">
           {/* Logo */}
           <Link to="/" className="flex items-center mb-8 space-x-2">
             <div className="relative">
@@ -94,12 +138,12 @@ export default function RiderAuth() {
           {/* Header */}
           <div className="mb-8">
             <h1 className="mb-2 text-4xl font-bold text-black">
-              {isLogin ? "Welcome back" : "Get started"}
+              {isLogin ? "Welcome back" : "Become a Rider"}
             </h1>
             <p className="text-gray-600">
               {isLogin
                 ? "Sign in to continue your journey"
-                : "Create your rider account today"}
+                : "Create your rider account and start earning"}
             </p>
           </div>
 
@@ -198,25 +242,79 @@ export default function RiderAuth() {
           ) : (
             /* Signup Form */
             <form onSubmit={handleSignup} className="space-y-6">
-              {/* Name Field */}
-              <div>
-                <label
-                  htmlFor="signup-name"
-                  className="block mb-2 text-sm font-semibold text-black"
-                >
-                  Full name
+              {/* Profile Photo Upload */}
+              <div className="flex flex-col items-center mb-6">
+                <label className="block mb-3 text-sm font-semibold text-black">
+                  Profile Photo
                 </label>
-                <div className="relative">
-                  <User className="absolute w-5 h-5 text-gray-400 -translate-y-1/2 left-4 top-1/2" />
-                  <input
-                    type="text"
-                    id="signup-name"
-                    value={signupName}
-                    onChange={(e) => setSignupName(e.target.value)}
-                    placeholder="Enter your full name"
-                    className="w-full py-4 pl-12 pr-4 transition-colors border-2 border-gray-200 rounded-xl focus:border-black focus:outline-none"
-                    required
-                  />
+                <div 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="relative w-24 h-24 overflow-hidden transition-all border-2 border-gray-200 border-dashed rounded-full cursor-pointer hover:border-black group"
+                >
+                  {photoPreview ? (
+                    <img 
+                      src={photoPreview} 
+                      alt="Profile preview" 
+                      className="object-cover w-full h-full"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center w-full h-full bg-gray-50 group-hover:bg-gray-100">
+                      <Camera className="w-8 h-8 text-gray-400" />
+                      <span className="mt-1 text-xs text-gray-500">Upload</span>
+                    </div>
+                  )}
+                </div>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handlePhotoChange}
+                  accept="image/*"
+                  className="hidden"
+                />
+                <p className="mt-2 text-xs text-gray-500">Click to upload your photo</p>
+              </div>
+
+              {/* Name Fields */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label
+                    htmlFor="first-name"
+                    className="block mb-2 text-sm font-semibold text-black"
+                  >
+                    First name
+                  </label>
+                  <div className="relative">
+                    <User className="absolute w-5 h-5 text-gray-400 -translate-y-1/2 left-4 top-1/2" />
+                    <input
+                      type="text"
+                      id="first-name"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      placeholder="First name"
+                      className="w-full py-4 pl-12 pr-4 transition-colors border-2 border-gray-200 rounded-xl focus:border-black focus:outline-none"
+                      required
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label
+                    htmlFor="last-name"
+                    className="block mb-2 text-sm font-semibold text-black"
+                  >
+                    Last name
+                  </label>
+                  <div className="relative">
+                    <User className="absolute w-5 h-5 text-gray-400 -translate-y-1/2 left-4 top-1/2" />
+                    <input
+                      type="text"
+                      id="last-name"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      placeholder="Last name"
+                      className="w-full py-4 pl-12 pr-4 transition-colors border-2 border-gray-200 rounded-xl focus:border-black focus:outline-none"
+                      required
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -297,6 +395,153 @@ export default function RiderAuth() {
                 </div>
               </div>
 
+              {/* License Number */}
+              <div>
+                <label
+                  htmlFor="license-number"
+                  className="block mb-2 text-sm font-semibold text-black"
+                >
+                  Driver's License Number
+                </label>
+                <div className="relative">
+                  <CreditCard className="absolute w-5 h-5 text-gray-400 -translate-y-1/2 left-4 top-1/2" />
+                  <input
+                    type="text"
+                    id="license-number"
+                    value={licenseNumber}
+                    onChange={(e) => setLicenseNumber(e.target.value)}
+                    placeholder="Enter your license number"
+                    className="w-full py-4 pl-12 pr-4 transition-colors border-2 border-gray-200 rounded-xl focus:border-black focus:outline-none"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Vehicle Information Section */}
+              <div className="pt-4 border-t border-gray-200">
+                <h3 className="mb-4 text-lg font-semibold text-black">Vehicle Information</h3>
+                
+                {/* Vehicle Type & Model */}
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label
+                      htmlFor="vehicle-type"
+                      className="block mb-2 text-sm font-semibold text-black"
+                    >
+                      Vehicle Type
+                    </label>
+                    <div className="relative">
+                      <Car className="absolute w-5 h-5 text-gray-400 -translate-y-1/2 left-4 top-1/2" />
+                      <select
+                        id="vehicle-type"
+                        value={vehicleType}
+                        onChange={(e) => setVehicleType(e.target.value)}
+                        className="w-full py-4 pl-12 pr-4 transition-colors bg-white border-2 border-gray-200 appearance-none rounded-xl focus:border-black focus:outline-none"
+                        required
+                      >
+                        <option value="" disabled>Select type</option>
+                        <option value="car">Car</option>
+                        <option value="auto">Auto</option>
+                        <option value="moto">Motorcycle</option>
+                        <option value="suv">SUV</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="vehicle-model"
+                      className="block mb-2 text-sm font-semibold text-black"
+                    >
+                      Vehicle Model
+                    </label>
+                    <div className="relative">
+                      <Car className="absolute w-5 h-5 text-gray-400 -translate-y-1/2 left-4 top-1/2" />
+                      <input
+                        type="text"
+                        id="vehicle-model"
+                        value={vehicleModel}
+                        onChange={(e) => setVehicleModel(e.target.value)}
+                        placeholder="e.g., Toyota Camry"
+                        className="w-full py-4 pl-12 pr-4 transition-colors border-2 border-gray-200 rounded-xl focus:border-black focus:outline-none"
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Vehicle Plate & Color */}
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label
+                      htmlFor="vehicle-plate"
+                      className="block mb-2 text-sm font-semibold text-black"
+                    >
+                      Plate Number
+                    </label>
+                    <div className="relative">
+                      <CreditCard className="absolute w-5 h-5 text-gray-400 -translate-y-1/2 left-4 top-1/2" />
+                      <input
+                        type="text"
+                        id="vehicle-plate"
+                        value={vehiclePlate}
+                        onChange={(e) => setVehiclePlate(e.target.value)}
+                        placeholder="e.g., ABC 1234"
+                        className="w-full py-4 pl-12 pr-4 transition-colors border-2 border-gray-200 rounded-xl focus:border-black focus:outline-none"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="vehicle-color"
+                      className="block mb-2 text-sm font-semibold text-black"
+                    >
+                      Vehicle Color
+                    </label>
+                    <div className="relative">
+                      <Palette className="absolute w-5 h-5 text-gray-400 -translate-y-1/2 left-4 top-1/2" />
+                      <input
+                        type="text"
+                        id="vehicle-color"
+                        value={vehicleColor}
+                        onChange={(e) => setVehicleColor(e.target.value)}
+                        placeholder="e.g., Black"
+                        className="w-full py-4 pl-12 pr-4 transition-colors border-2 border-gray-200 rounded-xl focus:border-black focus:outline-none"
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Vehicle Capacity */}
+                <div>
+                  <label
+                    htmlFor="vehicle-capacity"
+                    className="block mb-2 text-sm font-semibold text-black"
+                  >
+                    Passenger Capacity
+                  </label>
+                  <div className="relative">
+                    <Users className="absolute w-5 h-5 text-gray-400 -translate-y-1/2 left-4 top-1/2" />
+                    <select
+                      id="vehicle-capacity"
+                      value={vehicleCapacity}
+                      onChange={(e) => setVehicleCapacity(e.target.value)}
+                      className="w-full py-4 pl-12 pr-4 transition-colors bg-white border-2 border-gray-200 appearance-none rounded-xl focus:border-black focus:outline-none"
+                      required
+                    >
+                      <option value="" disabled>Select capacity</option>
+                      <option value="1">1 passenger</option>
+                      <option value="2">2 passengers</option>
+                      <option value="3">3 passengers</option>
+                      <option value="4">4 passengers</option>
+                      <option value="5">5 passengers</option>
+                      <option value="6">6+ passengers</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
               {/* Terms Checkbox */}
               <div className="flex items-start">
                 <input
@@ -333,7 +578,7 @@ export default function RiderAuth() {
                 type="submit"
                 className="flex items-center justify-center w-full py-4 space-x-2 font-semibold text-white transition-all duration-200 bg-black rounded-xl hover:bg-gray-800 group"
               >
-                <span>Create account</span>
+                <span>Create Rider Account</span>
                 <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
               </button>
             </form>
@@ -346,37 +591,6 @@ export default function RiderAuth() {
             <div className="flex-1 border-t border-gray-200"></div>
           </div>
 
-          {/* Social Login */}
-          <div className="grid grid-cols-2 gap-4">
-            <button className="flex items-center justify-center py-3 space-x-2 transition-colors border-2 border-gray-200 rounded-xl hover:border-black">
-              <svg className="w-5 h-5" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                />
-              </svg>
-              <span className="text-sm font-semibold">Google</span>
-            </button>
-
-            <button className="flex items-center justify-center py-3 space-x-2 transition-colors border-2 border-gray-200 rounded-xl hover:border-black">
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-              </svg>
-              <span className="text-sm font-semibold">Facebook</span>
-            </button>
-          </div>
 
           {/* Toggle Link */}
           <p className="mt-8 text-center text-gray-600">
