@@ -8,13 +8,41 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Handle login logic here
-    console.log("Login:", { email, password, rememberMe });
-    // On successful login redirect to home
-    navigate("/", { replace: true });
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch('http://localhost:3000/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Store token in localStorage
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+
+        // Redirect to home
+        navigate("/", { replace: true });
+      } else {
+        setError(data.message || 'Login failed');
+      }
+    } catch (err) {
+      setError('Network error. Please try again.');
+      console.error('Login error:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -58,6 +86,12 @@ export default function Login() {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
+            {error && (
+              <div className="p-3 text-red-700 bg-red-100 border border-red-400 rounded-lg">
+                {error}
+              </div>
+            )}
+
             {/* Email Field */}
             <div>
               <label
@@ -141,10 +175,11 @@ export default function Login() {
             {/* Submit Button */}
             <button
               type="submit"
-              className="flex items-center justify-center w-full py-4 space-x-2 font-semibold text-white transition-all duration-200 bg-black rounded-xl hover:bg-gray-800 group"
+              disabled={loading}
+              className="flex items-center justify-center w-full py-4 space-x-2 font-semibold text-white transition-all duration-200 bg-black rounded-xl hover:bg-gray-800 group disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <span>Sign in</span>
-              <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+              <span>{loading ? 'Signing in...' : 'Sign in'}</span>
+              {!loading && <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />}
             </button>
           </form>
 
