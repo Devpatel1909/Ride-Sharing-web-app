@@ -48,22 +48,52 @@ export default function RiderAuth() {
     }
   };
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    console.log("Login:", { loginEmail, loginPassword, rememberMe });
-    localStorage.setItem("isLoggedIn", "true");
-    navigate("/ride-search", { replace: true });
+    try {
+      const response = await fetch('http://localhost:3000/api/rider/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        localStorage.setItem('riderToken', data.token);
+        localStorage.setItem('rider', JSON.stringify(data.rider));
+        navigate('/ride-search', { replace: true });
+      } else {
+        alert(data.message || 'Login failed');
+      }
+    } catch (err) {
+      console.error('Login error:', err);
+      alert('Network error. Please try again.');
+    }
   };
 
-  const handleSignup = (e) => {
+  const handleSignup = async (e) => {
     e.preventDefault();
-    const formData = {
+
+    // Convert profile photo to base64 if exists
+    let profilePhotoBase64 = null;
+    if (profilePhoto) {
+      const reader = new FileReader();
+      profilePhotoBase64 = await new Promise((resolve) => {
+        reader.onload = () => resolve(reader.result);
+        reader.readAsDataURL(profilePhoto);
+      });
+    }
+
+    const signupData = {
       firstName,
       lastName,
       email: signupEmail,
       phone: signupPhone,
       password: signupPassword,
-      profilePhoto,
+      profilePhoto: profilePhotoBase64,
       licenseNumber,
       vehicle: {
         plate: vehiclePlate,
@@ -73,9 +103,29 @@ export default function RiderAuth() {
         model: vehicleModel,
       },
     };
-    console.log("Signup:", formData);
-    localStorage.setItem("isLoggedIn", "true");
-    navigate("/ride-search", { replace: true });
+
+    try {
+      const response = await fetch('http://localhost:3000/api/rider/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(signupData),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        localStorage.setItem('riderToken', data.token);
+        localStorage.setItem('rider', JSON.stringify(data.rider));
+        navigate('/ride-search', { replace: true });
+      } else {
+        alert(data.message || 'Signup failed');
+      }
+    } catch (err) {
+      console.error('Signup error:', err);
+      alert('Network error. Please try again.');
+    }
   };
 
   return (

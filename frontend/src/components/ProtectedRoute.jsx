@@ -2,12 +2,13 @@ import React from "react";
 import { Navigate } from "react-router-dom";
 
 export default function ProtectedRoute({ children }) {
-  // Check if user is logged in (check for token in localStorage)
-  const token = localStorage.getItem("token");
+  // Check if user or rider is logged in
+  const userToken = localStorage.getItem("token");
+  const riderToken = localStorage.getItem("riderToken");
 
-  if (!token) {
-    // Redirect to login if not authenticated
-    return <Navigate to="/login" replace />;
+  if (!userToken && !riderToken) {
+    // Redirect to rider login if not authenticated
+    return <Navigate to="/rider-login" replace />;
   }
 
   return children;
