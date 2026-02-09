@@ -8,6 +8,7 @@ import Landing from './pages/Landing'
 import Rider_login from './pages/Rider/Signup'
 import RideSearch from './pages/Rider/RideSearch'
 import ProtectedRoute from './components/ProtectedRoute'
+import MapPage from './pages/Map/MapPage'
 
 export default function App() {
   return (
@@ -20,6 +21,11 @@ export default function App() {
         <Route path="/ride-search" element={
           <ProtectedRoute>
             <RideSearch />
+          </ProtectedRoute>
+        } />
+        <Route path="/map" element={
+          <ProtectedRoute>
+            <MapPage />
           </ProtectedRoute>
         } />
 
