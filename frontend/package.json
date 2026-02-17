@@ -2,6 +2,7 @@
   "name": "ride-sharing-web-app",
   "private": true,
   "version": "0.0.0",
+  "funding": "https://opencollective.com/ride-sharing-web-app",
   "type": "module",
   "scripts": {
     "dev": "vite",

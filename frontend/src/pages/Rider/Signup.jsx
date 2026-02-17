@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Eye, EyeOff, ArrowRight, Mail, Lock, User, Phone, Camera, Car, CreditCard, Palette, Users, Search } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -215,12 +215,17 @@ export default function RiderAuth() {
       // API: https://rapidapi.com/suneetk92/api/vehicle-rc-information-v2
       // Using your RapidAPI key for vehicle registration details
       
+      // Prefer using an environment variable injected by Vite.
+      // Set your RapidAPI key in a `.env` file at the project root as:
+      // VITE_RAPIDAPI_KEY=your_rapidapi_key
+      const RAPIDAPI_KEY = import.meta.env.VITE_RAPIDAPI_KEY || 'fa6e4a4600msh5b363896fc69bd9p18ffc5jsn584834129323';
+
       const response = await fetch('https://vehicle-rc-information-v2.p.rapidapi.com/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-rapidapi-host': 'vehicle-rc-information-v2.p.rapidapi.com',
-          'x-rapidapi-key': 'fa6e4a4600msh5b363896fc69bd9p18ffc5jsn584834129323'
+          'x-rapidapi-key': RAPIDAPI_KEY
         },
         body: JSON.stringify({
           vehicle_number: formattedNumber
@@ -304,6 +309,28 @@ export default function RiderAuth() {
     setVehicleFetchError("");
     setVehicleFetchSuccess("");
   };
+
+  // Debounce auto-fetch when user types a valid vehicle plate
+  const plateDebounceRef = useRef(null);
+  useEffect(() => {
+    // clear any pending debounce
+    if (plateDebounceRef.current) clearTimeout(plateDebounceRef.current);
+
+    // only attempt auto-fetch for non-empty valid plates
+    if (!vehiclePlate || !isValidIndianVehicleNumber(vehiclePlate)) return;
+
+    // wait 800ms after typing stops
+    plateDebounceRef.current = setTimeout(() => {
+      // avoid duplicate fetches
+      if (!fetchingVehicleDetails) {
+        fetchVehicleDetails(vehiclePlate);
+      }
+    }, 800);
+
+    return () => {
+      if (plateDebounceRef.current) clearTimeout(plateDebounceRef.current);
+    };
+  }, [vehiclePlate]);
 
   // Handle manual fetch button click
   const handleFetchVehicleDetails = () => {
