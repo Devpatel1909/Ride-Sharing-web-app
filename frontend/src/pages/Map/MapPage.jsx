@@ -76,27 +76,40 @@ function MapControls({ onLocate }) {
     <div className="absolute right-4 top-4 z-[1000] flex flex-col gap-2">
       <button
         onClick={() => map.zoomIn()}
-        className="bg-white p-2 rounded-lg shadow-lg hover:bg-gray-100 transition-colors"
+        className="p-2 transition-colors bg-white rounded-lg shadow-lg hover:bg-gray-100"
         title="Zoom In"
       >
         <ZoomIn size={20} className="text-gray-700" />
       </button>
       <button
         onClick={() => map.zoomOut()}
-        className="bg-white p-2 rounded-lg shadow-lg hover:bg-gray-100 transition-colors"
+        className="p-2 transition-colors bg-white rounded-lg shadow-lg hover:bg-gray-100"
         title="Zoom Out"
       >
         <ZoomOut size={20} className="text-gray-700" />
       </button>
       <button
         onClick={onLocate}
-        className="bg-white p-2 rounded-lg shadow-lg hover:bg-gray-100 transition-colors"
+        className="p-2 transition-colors bg-white rounded-lg shadow-lg hover:bg-gray-100"
         title="Find My Location"
       >
         <Locate size={20} className="text-gray-700" />
       </button>
     </div>
   );
+}
+
+// Component to fly map to position when it changes
+function FlyToLocation({ position }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (position) {
+      map.flyTo([position.lat, position.lng], 15);
+    }
+  }, [position, map]);
+
+  return null;
 }
 
 export default function MapPage() {
@@ -107,6 +120,23 @@ export default function MapPage() {
   
   // Default center (you can change this to your preferred location)
   const defaultCenter = [28.6139, 77.2090]; // New Delhi, India
+
+  // Get user's current location on page load
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserPosition({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          });
+        },
+        (error) => {
+          console.error("Error getting location:", error);
+        }
+      );
+    }
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("isLoggedIn");
@@ -146,10 +176,10 @@ export default function MapPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="flex flex-col min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-black text-white z-[1001]">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="flex items-center justify-between px-4 py-4 mx-auto max-w-7xl">
           <Link to="/" className="flex items-center space-x-2">
             <div className="relative">
               <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
@@ -173,15 +203,15 @@ export default function MapPage() {
             <span className="text-2xl font-bold tracking-tight">RIDEX</span>
           </Link>
           <nav className="flex items-center space-x-6">
-            <Link to="/ride-search" className="text-sm font-medium hover:text-gray-300 transition-colors">
+            <Link to="/ride-search" className="text-sm font-medium transition-colors hover:text-gray-300">
               Search Rides
             </Link>
-            <Link to="/my-rides" className="text-sm font-medium hover:text-gray-300 transition-colors">
+            <Link to="/my-rides" className="text-sm font-medium transition-colors hover:text-gray-300">
               My Rides
             </Link>
             <button
               onClick={handleLogout}
-              className="text-sm font-medium bg-white text-black px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors"
+              className="px-4 py-2 text-sm font-medium text-black transition-colors bg-white rounded-lg hover:bg-gray-200"
             >
               Logout
             </button>
@@ -191,19 +221,19 @@ export default function MapPage() {
 
       {/* Search Bar Overlay */}
       <div className="absolute top-20 left-4 right-4 md:left-auto md:right-auto md:w-96 md:mx-auto z-[1000]">
-        <form onSubmit={handleSearch} className="bg-white rounded-2xl shadow-lg p-4">
+        <form onSubmit={handleSearch} className="p-4 bg-white shadow-lg rounded-2xl">
           <div className="flex items-center gap-3">
-            <MapPin className="text-gray-500 flex-shrink-0" size={20} />
+            <MapPin className="flex-shrink-0 text-gray-500" size={20} />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search for a destination..."
-              className="flex-1 outline-none text-gray-800 placeholder-gray-400"
+              className="flex-1 text-gray-800 placeholder-gray-400 outline-none"
             />
             <button
               type="submit"
-              className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors flex items-center gap-2"
+              className="flex items-center gap-2 px-4 py-2 text-white transition-colors bg-black rounded-lg hover:bg-gray-800"
             >
               <Navigation size={16} />
               <span className="hidden sm:inline">Go</span>
@@ -213,7 +243,7 @@ export default function MapPage() {
       </div>
 
       {/* Map Container */}
-      <div className="flex-1 relative">
+      <div className="relative flex-1">
         <MapContainer
           center={userPosition ? [userPosition.lat, userPosition.lng] : defaultCenter}
           zoom={13}
@@ -225,6 +255,7 @@ export default function MapPage() {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           
+          <FlyToLocation position={userPosition} />
           <LocationMarker position={userPosition} setPosition={setUserPosition} />
           
           {destination && (
@@ -235,7 +266,7 @@ export default function MapPage() {
                   <br />
                   <button
                     onClick={() => navigate(`/ride-search?destination=${encodeURIComponent(destination.name)}`)}
-                    className="mt-2 bg-black text-white px-3 py-1 rounded text-sm hover:bg-gray-800"
+                    className="px-3 py-1 mt-2 text-sm text-white bg-black rounded hover:bg-gray-800"
                   >
                     Book Ride Here
                   </button>
@@ -250,10 +281,10 @@ export default function MapPage() {
 
       {/* Bottom Action Bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-white shadow-lg border-t border-gray-200 p-4 z-[1000]">
-        <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
+        <div className="flex items-center justify-between max-w-4xl gap-4 mx-auto">
           <button
             onClick={handleLocateMe}
-            className="flex items-center gap-2 px-4 py-3 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
+            className="flex items-center gap-2 px-4 py-3 transition-colors bg-gray-100 rounded-xl hover:bg-gray-200"
           >
             <Locate size={20} className="text-gray-700" />
             <span className="text-sm font-medium text-gray-700">Find Me</span>
@@ -261,7 +292,7 @@ export default function MapPage() {
           
           <Link
             to="/ride-search"
-            className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors"
+            className="flex items-center justify-center flex-1 gap-2 px-6 py-3 text-white transition-colors bg-black rounded-xl hover:bg-gray-800"
           >
             <Navigation size={20} />
             <span className="font-medium">Book a Ride</span>

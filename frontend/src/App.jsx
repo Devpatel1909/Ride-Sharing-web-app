@@ -9,6 +9,7 @@ import Rider_login from './pages/Rider/Signup'
 import RideSearch from './pages/Rider/RideSearch'
 import ProtectedRoute from './components/ProtectedRoute'
 import MapPage from './pages/Map/MapPage'
+import Profile from './pages/Profile'
 
 export default function App() {
   return (
@@ -18,6 +19,11 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/rider-login" element={<Rider_login />} />
+        <Route path="/profile" element={
+          <ProtectedRoute>
+            <Profile />
+          </ProtectedRoute>
+        } />
         <Route path="/ride-search" element={
           <ProtectedRoute>
             <RideSearch />
@@ -26,7 +32,7 @@ export default function App() {
         <Route path="/map" element={
           <ProtectedRoute>
             <MapPage />
-          </ProtectedRoute>
+           </ProtectedRoute>
         } />
 
       </Routes>
