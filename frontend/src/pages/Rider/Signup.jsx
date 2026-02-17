@@ -218,7 +218,7 @@ export default function RiderAuth() {
       // Prefer using an environment variable injected by Vite.
       // Set your RapidAPI key in a `.env` file at the project root as:
       // VITE_RAPIDAPI_KEY=your_rapidapi_key
-      const RAPIDAPI_KEY = import.meta.env.VITE_RAPIDAPI_KEY || 'fa6e4a4600msh5b363896fc69bd9p18ffc5jsn584834129323';
+      const RAPIDAPI_KEY = import.meta.env.VITE_RAPIDAPI_KEY || '5ee5ed2c5amsh256b99057ea4d2bp1db86ajsndcfaffe8cb85';
 
       const response = await fetch('https://vehicle-rc-information-v2.p.rapidapi.com/', {
         method: 'POST',
@@ -316,16 +316,17 @@ export default function RiderAuth() {
     // clear any pending debounce
     if (plateDebounceRef.current) clearTimeout(plateDebounceRef.current);
 
+    // debug log for plate changes
+    console.debug('[Rider Signup] vehiclePlate changed:', vehiclePlate);
+
     // only attempt auto-fetch for non-empty valid plates
     if (!vehiclePlate || !isValidIndianVehicleNumber(vehiclePlate)) return;
 
-    // wait 800ms after typing stops
+    // wait 600ms after typing stops, then fetch
     plateDebounceRef.current = setTimeout(() => {
-      // avoid duplicate fetches
-      if (!fetchingVehicleDetails) {
-        fetchVehicleDetails(vehiclePlate);
-      }
-    }, 800);
+      console.debug('[Rider Signup] auto-fetching vehicle details for', vehiclePlate);
+      fetchVehicleDetails(vehiclePlate).catch((err) => console.error('Auto-fetch error:', err));
+    }, 600);
 
     return () => {
       if (plateDebounceRef.current) clearTimeout(plateDebounceRef.current);
