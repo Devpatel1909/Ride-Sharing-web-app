@@ -122,3 +122,26 @@ exports.getProfile = async (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+// Google OAuth callback handler
+exports.googleAuthCallback = async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=auth_failed`);
+    }
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { userId: req.user.id, email: req.user.email },
+      JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    );
+
+    // Redirect to frontend with token
+    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/auth/google/success?token=${token}`);
+
+  } catch (error) {
+    console.error('Google callback error:', error);
+    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=server_error`);
+  }
+};

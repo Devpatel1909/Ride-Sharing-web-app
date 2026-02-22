@@ -1,21 +1,56 @@
-/* Placeholder Uber Move font stylesheet
-   This file prevents Vite/Tailwind build errors when the real font files
-   are not present. Replace with the real font-face declarations as needed.
-*/
+/* UberMove Font - Professional ride-sharing typography */
 
 @font-face {
   font-family: 'UberMove';
-  /* Fallback to a system font if the true font files are missing */
-  src: local('Segoe UI'), local('Roboto'), local('Arial');
+  /* Fallback to high-quality system fonts if UberMove files are not available */
+  src: local('UberMove'), local('Segoe UI'), local('Roboto'), local('Helvetica Neue'), local('Arial');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 
-:root {
-  --uber-font: 'UberMove', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+@font-face {
+  font-family: 'UberMoveText';
+  src: local('UberMoveText'), local('Segoe UI'), local('Roboto'), local('Helvetica Neue'), local('Arial');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
 }
 
+@font-face {
+  font-family: 'UberMove';
+  src: local('UberMove Medium'), local('Segoe UI Semibold'), local('Roboto Medium'), local('Helvetica Neue Medium');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'UberMove';
+  src: local('UberMove Bold'), local('Segoe UI Bold'), local('Roboto Bold'), local('Helvetica Neue Bold');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* CSS Variables for UberMove font stacks */
+:root {
+  --uber-font-primary: 'UberMove', 'UberMoveText', system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --uber-font-text: 'UberMoveText', 'UberMove', system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+/* Apply UberMove globally */
 html, body {
-  font-family: var(--uber-font);
+  font-family: var(--uber-font-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Utility classes for UberMove variants */
+.font-uber {
+  font-family: var(--uber-font-primary);
+}
+
+.font-uber-text {
+  font-family: var(--uber-font-text);
 }

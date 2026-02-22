@@ -17,10 +17,10 @@ export default function Login() {
     setError("");
 
     try {
-      const response = await fetch('http://localhost:3000/api/auth/login', {
-        method: 'POST',
+      const response = await fetch("http://localhost:3000/api/auth/login", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ email, password }),
       });
@@ -29,65 +29,72 @@ export default function Login() {
 
       if (response.ok) {
         // Store token in localStorage
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
 
         // Redirect to home
         navigate("/", { replace: true });
       } else {
-        setError(data.message || 'Login failed');
+        setError(data.message || "Login failed");
       }
     } catch (err) {
-      setError('Network error. Please try again.');
-      console.error('Login error:', err);
+      setError("Network error. Please try again.");
+      console.error("Login error:", err);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex min-h-screen bg-white">
+    <div className="flex min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
+      <style>{`
+        body {
+          font-family:
+            "UberMove",
+            "UberMoveText",
+            system-ui,
+            -apple-system,
+            "Segoe UI",
+            "Helvetica Neue",
+            Helvetica,
+            Arial,
+            sans-serif;
+        }
+      `}</style>
+
       {/* Left Side - Form */}
       <div className="flex items-center justify-center w-full p-8 lg:w-1/2">
         <div className="w-full max-w-md">
           {/* Logo */}
-          <Link to="/" className="flex items-center mb-8 space-x-2">
-            <div className="relative">
-              <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-                <rect width="40" height="40" rx="8" fill="black" />
-                <path
-                  d="M12 20L18 14L24 20L30 14"
-                  stroke="white"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M12 26L18 20L24 26L30 20"
-                  stroke="white"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+          <Link to="/" className="flex items-center mb-8 space-x-3 group">
+            <div className="relative flex items-center justify-center w-12 h-12 text-xl font-bold text-white transition-all duration-300 ease-out shadow-2xl bg-gradient-to-br from-blue-600 via-purple-600 to-purple-700 rounded-xl shadow-blue-500/50 group-hover:shadow-blue-600/70 group-hover:scale-110 group-hover:rotate-3">
+              <span className="relative z-10 font-display">R</span>
+              <div className="absolute inset-0 transition-opacity duration-300 ease-out opacity-0 bg-gradient-to-br from-white/30 to-transparent rounded-xl group-hover:opacity-100"></div>
             </div>
             <div className="flex flex-col">
-              <span className="text-2xl font-bold tracking-tight text-black">
+              <span className="text-2xl font-bold leading-none tracking-tight text-transparent transition-all duration-300 ease-out bg-gradient-to-r from-blue-600 via-purple-600 to-purple-700 bg-clip-text font-display group-hover:scale-105">
                 RIDEX
+              </span>
+              <span className="text-[10px] text-slate-500 leading-none tracking-wider font-bold uppercase font-display">
+                Passenger Login
               </span>
             </div>
           </Link>
 
           {/* Header */}
           <div className="mb-8">
-            <h1 className="mb-2 text-4xl font-bold text-black">Welcome back</h1>
-            <p className="text-gray-600">Sign in to continue your journey</p>
+            <h1 className="mb-2 text-4xl font-bold text-transparent bg-gradient-to-r from-blue-600 via-purple-600 to-purple-700 bg-clip-text font-display">
+              Welcome back
+            </h1>
+            <p className="font-medium text-slate-600">
+              Sign in to continue your journey
+            </p>
           </div>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
-              <div className="p-3 text-red-700 bg-red-100 border border-red-400 rounded-lg">
+              <div className="p-4 text-red-700 border-2 border-red-200 bg-red-50 rounded-xl animate-in fade-in slide-in-from-top-2">
                 {error}
               </div>
             )}
@@ -96,19 +103,19 @@ export default function Login() {
             <div>
               <label
                 htmlFor="email"
-                className="block mb-2 text-sm font-semibold text-black"
+                className="block mb-2 text-sm font-bold text-slate-700 font-display"
               >
                 Email address
               </label>
               <div className="relative">
-                <Mail className="absolute w-5 h-5 text-gray-400 -translate-y-1/2 left-4 top-1/2" />
+                <Mail className="absolute w-5 h-5 transition-colors duration-300 ease-out -translate-y-1/2 text-slate-400 left-4 top-1/2" />
                 <input
                   type="email"
                   id="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter your email"
-                  className="w-full py-4 pl-12 pr-4 transition-colors border-2 border-gray-200 rounded-xl focus:border-black focus:outline-none"
+                  className="w-full py-4 pl-12 pr-4 font-medium transition-all duration-300 ease-out bg-white border-2 border-slate-200 rounded-xl focus:border-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-100 hover:border-slate-300 text-slate-800 placeholder:text-slate-400"
                   required
                 />
               </div>
@@ -118,25 +125,25 @@ export default function Login() {
             <div>
               <label
                 htmlFor="password"
-                className="block mb-2 text-sm font-semibold text-black"
+                className="block mb-2 text-sm font-bold text-slate-700 font-display"
               >
                 Password
               </label>
               <div className="relative">
-                <Lock className="absolute w-5 h-5 text-gray-400 -translate-y-1/2 left-4 top-1/2" />
+                <Lock className="absolute w-5 h-5 transition-colors duration-300 ease-out -translate-y-1/2 text-slate-400 left-4 top-1/2" />
                 <input
                   type={showPassword ? "text" : "password"}
                   id="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
-                  className="w-full py-4 pl-12 pr-12 transition-colors border-2 border-gray-200 rounded-xl focus:border-black focus:outline-none"
+                  className="w-full py-4 pl-12 pr-12 font-medium transition-all duration-300 ease-out bg-white border-2 border-slate-200 rounded-xl focus:border-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-100 hover:border-slate-300 text-slate-800 placeholder:text-slate-400"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute text-gray-400 transition-colors -translate-y-1/2 right-4 top-1/2 hover:text-black"
+                  className="absolute transition-all duration-300 ease-out -translate-y-1/2 text-slate-400 right-4 top-1/2 hover:text-blue-600 hover:scale-110"
                 >
                   {showPassword ? (
                     <EyeOff className="w-5 h-5" />
@@ -155,18 +162,18 @@ export default function Login() {
                   id="remember"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 border-2 border-gray-300 rounded cursor-pointer"
+                  className="w-4 h-4 transition-all duration-300 ease-out border-2 rounded cursor-pointer border-slate-300 accent-blue-600"
                 />
                 <label
                   htmlFor="remember"
-                  className="ml-2 text-sm text-gray-600 cursor-pointer"
+                  className="ml-2 text-sm font-medium transition-colors duration-300 ease-out cursor-pointer text-slate-600 hover:text-slate-800"
                 >
                   Remember me
                 </label>
               </div>
               <Link
                 to="/forgot-password"
-                className="text-sm font-semibold text-black transition-colors hover:text-gray-600"
+                className="text-sm font-bold text-transparent transition-all duration-300 ease-out bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text hover:from-blue-700 hover:to-purple-700 font-display"
               >
                 Forgot password?
               </Link>
@@ -176,23 +183,34 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="flex items-center justify-center w-full py-4 space-x-2 font-semibold text-white transition-all duration-200 bg-black rounded-xl hover:bg-gray-800 group disabled:opacity-50 disabled:cursor-not-allowed"
+              className="relative flex items-center justify-center w-full py-4 space-x-2 overflow-hidden font-bold text-white transition-all duration-300 ease-out shadow-2xl bg-gradient-to-r from-blue-600 via-purple-600 to-purple-700 rounded-xl hover:from-blue-700 hover:via-purple-700 hover:to-purple-800 shadow-blue-500/50 hover:shadow-blue-600/70 hover:-translate-y-1 hover:scale-105 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:scale-100 font-display"
             >
-              <span>{loading ? 'Signing in...' : 'Sign in'}</span>
-              {!loading && <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />}
+              <div className="absolute inset-0 transition-opacity duration-300 ease-out opacity-0 bg-gradient-to-r from-purple-700 via-purple-600 to-blue-600 group-hover:opacity-100"></div>
+              <span className="relative z-10">
+                {loading ? "Signing in..." : "Sign in"}
+              </span>
+              {!loading && (
+                <ArrowRight className="relative z-10 w-5 h-5 transition-transform duration-300 ease-out group-hover:translate-x-1" />
+              )}
             </button>
           </form>
 
           {/* Divider */}
           <div className="flex items-center my-8">
-            <div className="flex-1 border-t border-gray-200"></div>
-            <span className="px-4 text-sm text-gray-500">or continue with</span>
-            <div className="flex-1 border-t border-gray-200"></div>
+            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-300 to-transparent"></div>
+            <span className="px-4 text-sm font-medium text-slate-500">
+              or continue with
+            </span>
+            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-300 to-transparent"></div>
           </div>
 
           {/* Social Login */}
           <div className="grid grid-cols-2 gap-4">
-            <button className="flex items-center justify-center py-3 space-x-2 transition-colors border-2 border-gray-200 rounded-xl hover:border-black">
+            <button 
+              onClick={() => window.location.href = 'http://localhost:3000/api/auth/google'}
+              type="button"
+              className="flex items-center justify-center py-3 space-x-2 font-medium transition-all duration-300 ease-out bg-white border-2 border-slate-200 rounded-xl hover:border-blue-600 hover:bg-blue-50 hover:shadow-lg hover:-translate-y-1"
+            >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path
                   fill="#4285F4"
@@ -214,7 +232,7 @@ export default function Login() {
               <span className="text-sm font-semibold">Google</span>
             </button>
 
-            <button className="flex items-center justify-center py-3 space-x-2 transition-colors border-2 border-gray-200 rounded-xl hover:border-black">
+            <button className="flex items-center justify-center py-3 space-x-2 font-medium transition-all duration-300 ease-out bg-white border-2 border-slate-200 rounded-xl hover:border-purple-600 hover:bg-purple-50 hover:shadow-lg hover:-translate-y-1">
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
               </svg>
@@ -223,11 +241,11 @@ export default function Login() {
           </div>
 
           {/* Sign Up Link */}
-          <p className="mt-8 text-center text-gray-600">
+          <p className="mt-8 font-medium text-center text-slate-600">
             Don't have an account?{" "}
             <Link
               to="/signup"
-              className="font-semibold text-black transition-colors hover:text-gray-600"
+              className="font-bold text-transparent transition-all duration-300 ease-out bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text hover:from-blue-700 hover:to-purple-700 font-display"
             >
               Sign up
             </Link>
@@ -236,29 +254,34 @@ export default function Login() {
       </div>
 
       {/* Right Side - Image */}
-      <div className="relative hidden bg-black lg:block lg:w-1/2">
+      <div className="relative hidden bg-gradient-to-br from-blue-600 via-purple-600 to-purple-700 lg:block lg:w-1/2">
         <img
           src="https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&w=1200&q=80"
           alt="People sharing rides"
-          className="absolute inset-0 object-cover w-full h-full opacity-80"
+          className="absolute inset-0 object-cover w-full h-full opacity-50 mix-blend-overlay"
         />
-        <div className="absolute inset-0 bg-gradient-to-br from-black/50 to-transparent"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-600/80 via-purple-600/80 to-purple-700/80"></div>
 
         {/* Overlay Content */}
         <div className="absolute inset-0 flex flex-col justify-end p-12 text-white">
-          <h2 className="mb-4 text-4xl font-bold">Go anywhere with anyone</h2>
-          <p className="mb-8 text-xl text-gray-200">
+          <h2 className="mb-4 text-5xl font-bold font-display">
+            Go anywhere with anyone
+          </h2>
+          <p className="mb-8 text-xl font-medium text-blue-100">
             Join thousands of riders sharing rides and saving money every day.
           </p>
           <div className="flex items-center space-x-8">
-            <div>
-              <div className="text-3xl font-bold">50K+</div>
-              <div className="text-sm text-gray-300">Active riders</div>
+            <div className="relative p-6 overflow-hidden backdrop-blur-xl bg-white/10 rounded-2xl">
+              <div className="text-4xl font-bold font-display">50K+</div>
+              <div className="text-sm font-medium text-blue-100">
+                Active riders
+              </div>
             </div>
-            <div className="w-px h-12 bg-white/30"></div>
-            <div>
-              <div className="text-3xl font-bold">60%</div>
-              <div className="text-sm text-gray-300">Avg. savings</div>
+            <div className="relative p-6 overflow-hidden backdrop-blur-xl bg-white/10 rounded-2xl">
+              <div className="text-4xl font-bold font-display">60%</div>
+              <div className="text-sm font-medium text-blue-100">
+                Avg. savings
+              </div>
             </div>
           </div>
         </div>

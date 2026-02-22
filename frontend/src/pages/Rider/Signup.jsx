@@ -9,28 +9,42 @@ import { Link, useNavigate } from "react-router-dom";
  * 
  * 📖 See detailed setup guide: /API_CONFIGURATION_GUIDE.md
  * 
- * ✅ VEHICLE API: CONFIGURED AND ACTIVE
+ * ⚠️ VEHICLE API: CONFIGURED BUT API PROVIDER HAS ISSUES
  * API: Vehicle RC Information V2 (RapidAPI)
  * Endpoint: https://vehicle-rc-information-v2.p.rapidapi.com/
- * Status: Fully functional - fetches vehicle details by registration number
+ * Status: API experiencing "Provider configuration error" 
+ * Issue: The API provider's backend is having issues parsing responses
+ * Workaround: Users can manually enter vehicle details
  * Location: fetchVehicleDetails() function (line ~220)
- * Test with: PB65AM0008, DL01AB1234, or any valid Indian vehicle number
+ * Auto-fetch: Currently disabled to prevent failed API spam
  * 
  * ⚠️ LICENSE API: MOCK MODE (Format validation only)
  * Status: Validates license number format, no real API verification yet
  * Location: verifyLicenseDetails() function (line ~90)
  * To enable: Replace placeholder URL with actual license verification API
  * 
- * How Vehicle Auto-Fetch Works:
+ * How Vehicle Fetch Works (when API is functional):
  * 1. User enters vehicle number (e.g., DL01AB1234)
  * 2. Clicks "Search Vehicle Details" button
- * 3. API fetches: Model, Color, Capacity, Type
- * 4. Fields auto-fill (user can edit if needed)
+ * 3. API attempts to fetch: Model, Color, Capacity, Type
+ * 4. If successful: Fields auto-fill (user can edit if needed)
+ * 5. If failed: User enters details manually
  */
 
 export default function RiderAuth() {
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
+  
+  // Check if rider is already logged in and redirect to dashboard
+  useEffect(() => {
+    const riderToken = localStorage.getItem('riderToken');
+    const rider = localStorage.getItem('rider');
+    
+    if (riderToken && rider) {
+      // Rider is already logged in, redirect to dashboard
+      navigate('/rider/dashboard', { replace: true });
+    }
+  }, [navigate]);
   
   // Login state
   const [loginEmail, setLoginEmail] = useState("");
@@ -220,6 +234,10 @@ export default function RiderAuth() {
       // VITE_RAPIDAPI_KEY=your_rapidapi_key
       const RAPIDAPI_KEY = import.meta.env.VITE_RAPIDAPI_KEY || '5ee5ed2c5amsh256b99057ea4d2bp1db86ajsndcfaffe8cb85';
 
+      if (!RAPIDAPI_KEY || RAPIDAPI_KEY === 'your_rapidapi_key_here') {
+        throw new Error('API key not configured. Please add VITE_RAPIDAPI_KEY to your .env file.');
+      }
+
       const response = await fetch('https://vehicle-rc-information-v2.p.rapidapi.com/', {
         method: 'POST',
         headers: {
@@ -232,12 +250,50 @@ export default function RiderAuth() {
         })
       });
       
-      if (!response.ok) {
-        throw new Error('Vehicle details not found');
+      // Check for API errors
+      if (response.status === 401) {
+        throw new Error('Invalid API key. Please check your RapidAPI configuration.');
       }
       
-      const data = await response.json();
-      console.log('API Response:', data); // For debugging
+      if (response.status === 429) {
+        throw new Error('API rate limit exceeded. Please try again later.');
+      }
+      
+      if (!response.ok) {
+        // Try to get error details from response
+        let errorData = {};
+        const responseText = await response.text();
+        
+        try {
+          errorData = JSON.parse(responseText);
+        } catch {
+          console.error('Failed to parse error response:', responseText);
+        }
+        
+        throw new Error(errorData.message || 'Vehicle details not found');
+      }
+      
+      // Parse response with better error handling
+      let data;
+      const responseText = await response.text();
+      
+      try {
+        data = JSON.parse(responseText);
+        console.log('API Response:', data); // For debugging
+      } catch {
+        console.error('Failed to parse API response:', responseText);
+        throw new Error('API_PARSE_ERROR');
+      }
+      
+      // Check for RapidAPI provider errors
+      if (data.message && data.message.includes('Provider configuration error')) {
+        throw new Error('API_PROVIDER_ERROR');
+      }
+      
+      // Check for error in response
+      if (data.error || data.status === 'error') {
+        throw new Error(data.message || 'Vehicle not found in database');
+      }
       
       // Map RapidAPI response to form fields
       // Adjust field names based on actual API response structure
@@ -283,18 +339,36 @@ export default function RiderAuth() {
         setVehicleFetchSuccess('Vehicle details fetched successfully!');
         setTimeout(() => setVehicleFetchSuccess(''), 3000);
       } else {
-        throw new Error('Invalid response format');
+        throw new Error('Invalid response format from API');
       }
     } catch (error) {
       console.error('Error fetching vehicle details:', error);
       
-      // Show error message - user can enter details manually
-      setVehicleFetchError(
-        error.message === 'Vehicle details not found' 
-          ? 'Vehicle not found. Please check the number or enter details manually.' 
-          : 'Unable to fetch vehicle details. Please enter manually.'
-      );
-      setTimeout(() => setVehicleFetchError(''), 5000);
+      // Show specific error messages
+      let errorMessage = 'Unable to fetch vehicle details. Please enter manually.';
+      
+      if (error.message === 'API_PROVIDER_ERROR') {
+        errorMessage = '⚠️ API service temporarily unavailable. Please enter vehicle details manually.';
+        console.warn('RapidAPI Provider Error: The Vehicle RC Information API is experiencing issues.');
+        console.info('This is not an issue with your code. The API provider needs to fix their service.');
+      } else if (error.message === 'API_PARSE_ERROR') {
+        errorMessage = '⚠️ API returned invalid data. Please enter vehicle details manually.';
+        console.warn('API returned data that could not be parsed as JSON.');
+      } else if (error.message.includes('API key')) {
+        errorMessage = error.message;
+      } else if (error.message.includes('rate limit')) {
+        errorMessage = 'Too many requests. Please wait a moment and try again.';
+      } else if (error.message.includes('not found') || error.message.includes('not found in database')) {
+        errorMessage = 'Vehicle not found. Please check the number or enter details manually.';
+      } else if (error.message.includes('Provider configuration error')) {
+        errorMessage = '⚠️ API service issue. Please enter vehicle details manually.';
+        console.warn('RapidAPI Provider configuration error detected.');
+      } else if (error instanceof TypeError && error.message.includes('fetch')) {
+        errorMessage = 'Network error. Please check your internet connection.';
+      }
+      
+      setVehicleFetchError(errorMessage);
+      setTimeout(() => setVehicleFetchError(''), 8000);
     } finally {
       setFetchingVehicleDetails(false);
     }
@@ -311,6 +385,8 @@ export default function RiderAuth() {
   };
 
   // Debounce auto-fetch when user types a valid vehicle plate
+  // NOTE: Auto-fetch is currently disabled due to API instability
+  // Users can manually click "Search Vehicle Details" button instead
   const plateDebounceRef = useRef(null);
   useEffect(() => {
     // clear any pending debounce
@@ -319,17 +395,19 @@ export default function RiderAuth() {
     // debug log for plate changes
     console.debug('[Rider Signup] vehiclePlate changed:', vehiclePlate);
 
+    // AUTO-FETCH DISABLED: Uncomment below to re-enable when API is stable
     // only attempt auto-fetch for non-empty valid plates
-    if (!vehiclePlate || !isValidIndianVehicleNumber(vehiclePlate)) return;
+    // if (!vehiclePlate || !isValidIndianVehicleNumber(vehiclePlate)) return;
 
     // wait 600ms after typing stops, then fetch
-    plateDebounceRef.current = setTimeout(() => {
-      console.debug('[Rider Signup] auto-fetching vehicle details for', vehiclePlate);
-      fetchVehicleDetails(vehiclePlate).catch((err) => console.error('Auto-fetch error:', err));
-    }, 600);
+    // plateDebounceRef.current = setTimeout(() => {
+    //   console.debug('[Rider Signup] auto-fetching vehicle details for', vehiclePlate);
+    //   fetchVehicleDetails(vehiclePlate).catch((err) => console.error('Auto-fetch error:', err));
+    // }, 600);
 
     return () => {
-      if (plateDebounceRef.current) clearTimeout(plateDebounceRef.current);
+      const timeoutId = plateDebounceRef.current;
+      if (timeoutId) clearTimeout(timeoutId);
     };
   }, [vehiclePlate]);
 
@@ -366,7 +444,7 @@ export default function RiderAuth() {
       if (response.ok) {
         localStorage.setItem('riderToken', data.token);
         localStorage.setItem('rider', JSON.stringify(data.rider));
-        navigate('/ride-search', { replace: true });
+        navigate('/rider/dashboard', { replace: true });
       } else {
         alert(data.message || 'Login failed');
       }
@@ -420,7 +498,7 @@ export default function RiderAuth() {
       if (response.ok) {
         localStorage.setItem('riderToken', data.token);
         localStorage.setItem('rider', JSON.stringify(data.rider));
-        navigate('/ride-search', { replace: true });
+        navigate('/rider/dashboard', { replace: true });
       } else {
         alert(data.message || 'Signup failed');
       }
@@ -431,56 +509,50 @@ export default function RiderAuth() {
   };
 
   return (
-    <div className="flex min-h-screen bg-white">
+    <div className="flex min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
+      <style>{`
+        body {
+          font-family: 'UberMove', 'UberMoveText', system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        }
+      `}</style>
+      
       {/* Left Side - Form */}
       <div className="flex items-start justify-center w-full p-8 overflow-y-auto lg:w-1/2">
         <div className="w-full max-w-md py-8">
           {/* Logo */}
-          <Link to="/" className="flex items-center mb-8 space-x-2">
-            <div className="relative">
-              <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-                <rect width="40" height="40" rx="8" fill="black" />
-                <path
-                  d="M12 20L18 14L24 20L30 14"
-                  stroke="white"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M12 26L18 20L24 26L30 20"
-                  stroke="white"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+          <Link to="/" className="flex items-center mb-8 space-x-3 group">
+            <div className="relative flex items-center justify-center w-12 h-12 text-xl font-bold text-white transition-all duration-300 ease-out shadow-2xl bg-gradient-to-br from-purple-600 via-blue-600 to-purple-700 rounded-xl shadow-purple-500/50 group-hover:shadow-blue-600/70 group-hover:scale-110 group-hover:rotate-3">
+              <span className="relative z-10 font-display">R</span>
+              <div className="absolute inset-0 transition-opacity duration-300 ease-out opacity-0 bg-gradient-to-br from-white/30 to-transparent rounded-xl group-hover:opacity-100"></div>
             </div>
             <div className="flex flex-col">
-              <span className="text-2xl font-bold tracking-tight text-black">
+              <span className="text-2xl font-bold leading-none tracking-tight text-transparent transition-all duration-300 ease-out bg-gradient-to-r from-purple-600 via-blue-600 to-purple-700 bg-clip-text font-display group-hover:scale-105">
                 RIDEX
+              </span>
+              <span className="text-[10px] text-slate-500 leading-none tracking-wider font-bold uppercase font-display">
+                Rider Portal
               </span>
             </div>
           </Link>
 
           {/* Tab Switcher */}
-          <div className="flex p-1 mb-8 bg-gray-100 rounded-xl">
+          <div className="flex p-1 mb-8 border-2 border-purple-200 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl">
             <button
               onClick={() => setIsLogin(true)}
-              className={`flex-1 py-3 text-sm font-semibold rounded-lg transition-all ${
+              className={`flex-1 py-3 text-sm font-bold rounded-lg transition-all duration-300 ease-out font-display ${
                 isLogin
-                  ? "bg-white text-black shadow-sm"
-                  : "text-gray-600 hover:text-black"
+                  ? "bg-gradient-to-r from-purple-600 via-blue-600 to-purple-700 text-white shadow-lg shadow-purple-500/30"
+                  : "text-slate-600 hover:text-purple-700"
               }`}
             >
               Login
             </button>
             <button
               onClick={() => setIsLogin(false)}
-              className={`flex-1 py-3 text-sm font-semibold rounded-lg transition-all ${
+              className={`flex-1 py-3 text-sm font-bold rounded-lg transition-all duration-300 ease-out font-display ${
                 !isLogin
-                  ? "bg-white text-black shadow-sm"
-                  : "text-gray-600 hover:text-black"
+                  ? "bg-gradient-to-r from-purple-600 via-blue-600 to-purple-700 text-white shadow-lg shadow-purple-500/30"
+                  : "text-slate-600 hover:text-purple-700"
               }`}
             >
               Sign Up
@@ -489,10 +561,10 @@ export default function RiderAuth() {
 
           {/* Header */}
           <div className="mb-8">
-            <h1 className="mb-2 text-4xl font-bold text-black">
+            <h1 className="mb-2 text-4xl font-bold text-transparent bg-gradient-to-r from-purple-600 via-blue-600 to-purple-700 bg-clip-text font-display">
               {isLogin ? "Welcome back" : "Become a Rider"}
             </h1>
-            <p className="text-gray-600">
+            <p className="font-medium text-slate-600">
               {isLogin
                 ? "Sign in to continue your journey"
                 : "Create your rider account and start earning"}
@@ -506,19 +578,19 @@ export default function RiderAuth() {
               <div>
                 <label
                   htmlFor="login-email"
-                  className="block mb-2 text-sm font-semibold text-black"
+                  className="block mb-2 text-sm font-bold text-slate-700 font-display"
                 >
                   Email address
                 </label>
                 <div className="relative">
-                  <Mail className="absolute w-5 h-5 text-gray-400 -translate-y-1/2 left-4 top-1/2" />
+                  <Mail className="absolute w-5 h-5 transition-colors duration-300 ease-out -translate-y-1/2 text-slate-400 left-4 top-1/2" />
                   <input
                     type="email"
                     id="login-email"
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
                     placeholder="Enter your email"
-                    className="w-full py-4 pl-12 pr-4 transition-colors border-2 border-gray-200 rounded-xl focus:border-black focus:outline-none"
+                    className="w-full py-4 pl-12 pr-4 font-medium transition-all duration-300 ease-out bg-white border-2 border-slate-200 rounded-xl focus:border-purple-600 focus:outline-none focus:ring-4 focus:ring-purple-100 hover:border-slate-300 text-slate-800 placeholder:text-slate-400"
                     required
                   />
                 </div>
@@ -528,25 +600,25 @@ export default function RiderAuth() {
               <div>
                 <label
                   htmlFor="login-password"
-                  className="block mb-2 text-sm font-semibold text-black"
+                  className="block mb-2 text-sm font-bold text-slate-700 font-display"
                 >
                   Password
                 </label>
                 <div className="relative">
-                  <Lock className="absolute w-5 h-5 text-gray-400 -translate-y-1/2 left-4 top-1/2" />
+                  <Lock className="absolute w-5 h-5 transition-colors duration-300 ease-out -translate-y-1/2 text-slate-400 left-4 top-1/2" />
                   <input
                     type={showLoginPassword ? "text" : "password"}
                     id="login-password"
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
                     placeholder="Enter your password"
-                    className="w-full py-4 pl-12 pr-12 transition-colors border-2 border-gray-200 rounded-xl focus:border-black focus:outline-none"
+                    className="w-full py-4 pl-12 pr-12 font-medium transition-all duration-300 ease-out bg-white border-2 border-slate-200 rounded-xl focus:border-purple-600 focus:outline-none focus:ring-4 focus:ring-purple-100 hover:border-slate-300 text-slate-800 placeholder:text-slate-400"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowLoginPassword(!showLoginPassword)}
-                    className="absolute text-gray-400 transition-colors -translate-y-1/2 right-4 top-1/2 hover:text-black"
+                    className="absolute transition-all duration-300 ease-out -translate-y-1/2 text-slate-400 right-4 top-1/2 hover:text-purple-600 hover:scale-110"
                   >
                     {showLoginPassword ? (
                       <EyeOff className="w-5 h-5" />
@@ -585,10 +657,16 @@ export default function RiderAuth() {
               {/* Submit Button */}
               <button
                 type="submit"
-                className="flex items-center justify-center w-full py-4 space-x-2 font-semibold text-white transition-all duration-200 bg-black rounded-xl hover:bg-gray-800 group"
+                className="relative flex items-center justify-center w-full py-5 space-x-3 overflow-hidden font-bold text-white transition-all duration-500 ease-out shadow-2xl bg-gradient-to-r from-purple-600 via-blue-600 to-purple-700 rounded-2xl hover:from-purple-700 hover:via-blue-700 hover:to-purple-800 shadow-purple-500/50 hover:shadow-blue-600/80 hover:-translate-y-2 hover:scale-[1.02] hover:shadow-3xl group font-display"
               >
-                <span>Sign in</span>
-                <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+                {/* Animated gradient overlay */}
+                <div className="absolute inset-0 transition-opacity duration-500 ease-out opacity-0 bg-gradient-to-r from-blue-700 via-purple-600 to-blue-600 group-hover:opacity-100"></div>
+                
+                {/* Shine effect */}
+                <div className="absolute inset-0 transition-transform duration-700 ease-out -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent group-hover:translate-x-full"></div>
+                
+                <span className="relative z-10 text-lg tracking-wide">Sign in</span>
+                <ArrowRight className="relative z-10 w-6 h-6 transition-all duration-500 ease-out group-hover:translate-x-2 group-hover:scale-110" />
               </button>
             </form>
           ) : (
@@ -992,24 +1070,24 @@ export default function RiderAuth() {
                   id="terms"
                   checked={agreeTerms}
                   onChange={(e) => setAgreeTerms(e.target.checked)}
-                  className="w-4 h-4 mt-1 border-2 border-gray-300 rounded cursor-pointer"
+                  className="w-4 h-4 mt-1 transition-all duration-300 ease-out border-2 rounded cursor-pointer border-slate-300 accent-purple-600"
                   required
                 />
                 <label
                   htmlFor="terms"
-                  className="ml-2 text-sm text-gray-600 cursor-pointer"
+                  className="ml-2 text-sm font-medium transition-colors duration-300 ease-out cursor-pointer text-slate-600 hover:text-slate-800"
                 >
                   I agree to the{" "}
                   <Link
                     to="/terms"
-                    className="font-semibold text-black hover:underline"
+                    className="font-bold text-transparent transition-all duration-300 ease-out bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text hover:from-purple-700 hover:to-blue-700"
                   >
                     Terms of Service
                   </Link>{" "}
                   and{" "}
                   <Link
                     to="/privacy"
-                    className="font-semibold text-black hover:underline"
+                    className="font-bold text-transparent transition-all duration-300 ease-out bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text hover:from-purple-700 hover:to-blue-700"
                   >
                     Privacy Policy
                   </Link>
@@ -1019,10 +1097,21 @@ export default function RiderAuth() {
               {/* Submit Button */}
               <button
                 type="submit"
-                className="flex items-center justify-center w-full py-4 space-x-2 font-semibold text-white transition-all duration-200 bg-black rounded-xl hover:bg-gray-800 group"
+                className="relative flex items-center justify-center w-full py-5 space-x-3 overflow-hidden font-bold text-white transition-all duration-500 ease-out shadow-2xl bg-gradient-to-r from-purple-600 via-blue-600 to-purple-700 rounded-2xl hover:from-purple-700 hover:via-blue-700 hover:to-purple-800 shadow-purple-500/50 hover:shadow-blue-600/80 hover:-translate-y-2 hover:scale-[1.02] hover:shadow-3xl group font-display"
+                style={{ fontFamily: "'UberMove', 'UberMoveText', system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" }}
               >
-                <span>Create Rider Account</span>
-                <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+                {/* Animated gradient overlay */}
+                <div className="absolute inset-0 transition-opacity duration-500 ease-out opacity-0 bg-gradient-to-r from-blue-700 via-purple-600 to-blue-600 group-hover:opacity-100"></div>
+                
+                {/* Shine effect */}
+                <div className="absolute inset-0 transition-transform duration-700 ease-out -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent group-hover:translate-x-full"></div>
+                
+                {/* Pulse ring on hover */}
+                <div className="absolute inset-0 transition-all duration-500 ease-out scale-100 opacity-0 rounded-2xl bg-gradient-to-r from-purple-600 to-blue-600 group-hover:scale-105 group-hover:opacity-20 blur-xl"></div>
+                
+                {/* Button content */}
+                <span className="relative z-10 text-lg tracking-wide">Create Rider Account</span>
+                <ArrowRight className="relative z-10 w-6 h-6 transition-all duration-500 ease-out group-hover:translate-x-2 group-hover:scale-110" />
               </button>
             </form>
           )}
@@ -1036,13 +1125,13 @@ export default function RiderAuth() {
 
 
           {/* Toggle Link */}
-          <p className="mt-8 text-center text-gray-600">
+          <p className="mt-8 font-medium text-center text-slate-600">
             {isLogin ? (
               <>
                 Don't have an account?{" "}
                 <button
                   onClick={() => setIsLogin(false)}
-                  className="font-semibold text-black transition-colors hover:text-gray-600"
+                  className="font-bold text-transparent transition-all duration-300 ease-out bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text hover:from-purple-700 hover:to-blue-700 font-display"
                 >
                   Sign up
                 </button>
@@ -1052,7 +1141,7 @@ export default function RiderAuth() {
                 Already have an account?{" "}
                 <button
                   onClick={() => setIsLogin(true)}
-                  className="font-semibold text-black transition-colors hover:text-gray-600"
+                  className="font-bold text-transparent transition-all duration-300 ease-out bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text hover:from-purple-700 hover:to-blue-700 font-display"
                 >
                   Sign in
                 </button>
@@ -1063,39 +1152,50 @@ export default function RiderAuth() {
       </div>
 
       {/* Right Side - Image */}
-      <div className="relative hidden bg-black lg:block lg:w-1/2">
+      <div className="relative hidden bg-gradient-to-br from-purple-600 via-blue-600 to-purple-700 lg:block lg:w-1/2">
         <img
           src="https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&w=1200&q=80"
           alt="Riders on the road"
-          className="absolute inset-0 object-cover w-full h-full opacity-80"
+          className="absolute inset-0 object-cover w-full h-full opacity-50 mix-blend-overlay"
         />
-        <div className="absolute inset-0 bg-gradient-to-br from-black/50 to-transparent"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-600/80 via-blue-600/80 to-purple-700/80"></div>
 
         {/* Overlay Content */}
         <div className="absolute inset-0 flex flex-col justify-end p-12 text-white">
-          <h2 className="mb-4 text-4xl font-bold">
+          <h2 className="mb-4 text-5xl font-bold font-display">
             {isLogin
               ? "Go anywhere with anyone"
               : "Start earning on your schedule"}
           </h2>
-          <p className="mb-8 text-xl text-gray-200">
+          <p className="mb-8 text-xl font-medium text-blue-100">
             {isLogin
               ? "Join thousands of riders sharing rides and saving money every day."
               : "Become a rider and earn flexible income while helping people get around."}
           </p>
-          <div className="flex items-center space-x-8">
-            <div>
-              <div className="text-3xl font-bold">50K+</div>
-              <div className="text-sm text-gray-300">Active riders</div>
+          <div className="space-y-4">
+            <div className="flex items-center space-x-3">
+              <div className="flex items-center justify-center w-12 h-12 bg-white/10 backdrop-blur-xl rounded-xl">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <span className="text-lg font-medium">Flexible working hours</span>
             </div>
-            <div className="w-px h-12 bg-white/30"></div>
-            <div>
-              <div className="text-3xl font-bold">
-                {isLogin ? "60%" : "$2.5M"}
+            <div className="flex items-center space-x-3">
+              <div className="flex items-center justify-center w-12 h-12 bg-white/10 backdrop-blur-xl rounded-xl">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
               </div>
-              <div className="text-sm text-gray-300">
-                {isLogin ? "Avg. savings" : "Weekly earnings"}
+              <span className="text-lg font-medium">Competitive earnings</span>
+            </div>
+            <div className="flex items-center space-x-3">
+              <div className="flex items-center justify-center w-12 h-12 bg-white/10 backdrop-blur-xl rounded-xl">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
               </div>
+              <span className="text-lg font-medium">Instant payouts</span>
             </div>
           </div>
         </div>
