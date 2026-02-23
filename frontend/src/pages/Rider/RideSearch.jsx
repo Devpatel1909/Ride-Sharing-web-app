@@ -584,7 +584,7 @@ export default function RideSearch() {
                           <span className="text-2xl">₹{sharedPrice}</span>
                         </div>
                       ) : (
-                        <div className="px-4 py-2 text-sm font-semibold text-slate-400 rounded-full bg-slate-100 font-display">
+                        <div className="px-4 py-2 text-sm font-semibold rounded-full text-slate-400 bg-slate-100 font-display">
                           Unavailable
                         </div>
                       )}
@@ -644,7 +644,7 @@ export default function RideSearch() {
                           <span className="text-2xl">₹{personalPrice}</span>
                         </div>
                       ) : (
-                        <div className="px-4 py-2 text-sm font-semibold text-slate-400 rounded-full bg-slate-100 font-display">
+                        <div className="px-4 py-2 text-sm font-semibold rounded-full text-slate-400 bg-slate-100 font-display">
                           Unavailable
                         </div>
                       )}

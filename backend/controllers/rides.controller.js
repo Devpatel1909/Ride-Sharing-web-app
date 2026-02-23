@@ -55,10 +55,12 @@ exports.checkAvailability = async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const RADIUS_KM = 2.0; // Search radius around pickup
     const allVehicleIds = ['bike', 'auto', 'car', 'suv'];
 
-    // Fetch all online riders not currently on an active ride
+    // Fetch ALL online riders not currently on an active ride
+    // NOTE: checkAvailability shows vehicle options to passenger.
+    // We show ALL online riders here — GPS proximity is only used for
+    // sorting (nearest first) and for deciding who gets the booking notification.
     const query = `
       SELECT 
         r.id,
@@ -66,8 +68,11 @@ exports.checkAvailability = async (req, res) => {
         r.last_name,
         r.vehicle_type,
         r.vehicle_model,
+        r.vehicle_color,
+        r.vehicle_plate,
         r.current_location,
-        r.rating
+        r.rating,
+        r.profile_photo
       FROM riders r
       WHERE r.is_online = true
       AND r.id NOT IN (
@@ -80,36 +85,27 @@ exports.checkAvailability = async (req, res) => {
     const result = await pool.query(query);
     const onlineRiders = result.rows;
 
+    console.log('\n🔍 === RIDER AVAILABILITY CHECK ===');
+    console.log(`📊 Total Online Riders Found: ${onlineRiders.length}`);
+
     const hasPickupCoords = pickupLat != null && pickupLon != null &&
       !isNaN(parseFloat(pickupLat)) && !isNaN(parseFloat(pickupLon));
 
     const pLat = parseFloat(pickupLat);
     const pLon = parseFloat(pickupLon);
 
-    // Classify riders: nearby (within radius) vs unknown location
-    const nearbyRiders = [];
-    const noLocationRiders = [];
-
-    for (const rider of onlineRiders) {
+    // Annotate every rider with their distance from pickup (for sorting / display)
+    // but do NOT filter any out — all online riders are shown
+    const ridersToCount = onlineRiders.map(rider => {
       if (!hasPickupCoords || !rider.current_location) {
-        noLocationRiders.push({ ...rider, distanceKm: null });
-        continue;
+        return { ...rider, distanceKm: null };
       }
       const coords = parseLocation(rider.current_location);
-      if (!coords) {
-        noLocationRiders.push({ ...rider, distanceKm: null });
-        continue;
-      }
+      if (!coords) return { ...rider, distanceKm: null };
       const d = calculateDistance(pLat, pLon, coords.lat, coords.lng);
-      if (d <= RADIUS_KM) {
-        nearbyRiders.push({ ...rider, distanceKm: parseFloat(d.toFixed(2)) });
-      }
-    }
-
-    // Build per-vehicle availability
-    // If we have pickup coords: only count riders within radius
-    // If no pickup coords: use all online riders (unknown location)
-    const ridersToCount = hasPickupCoords ? nearbyRiders : [...nearbyRiders, ...noLocationRiders];
+      console.log(`  🏍️  ${rider.first_name} ${rider.last_name} [${rider.vehicle_type || 'no-type'}] → ${d.toFixed(2)} km from pickup`);
+      return { ...rider, distanceKm: parseFloat(d.toFixed(2)) };
+    });
 
     const vehicleAvailability = {};
     for (const v of allVehicleIds) {
@@ -124,6 +120,9 @@ exports.checkAvailability = async (req, res) => {
           id: r.id,
           name: `${r.first_name || ''} ${r.last_name || ''}`.trim(),
           vehicleModel: r.vehicle_model || '',
+          vehicleColor: r.vehicle_color || '',
+          vehiclePlate: r.vehicle_plate || '',
+          profilePhoto: r.profile_photo || null,
           rating: parseFloat(r.rating) || 5.0,
           distanceKm: r.distanceKm,
         }))
@@ -148,7 +147,8 @@ exports.checkAvailability = async (req, res) => {
     const personalAvailable = totalNearby > 0;
     const sharedAvailable = dist > 5 && totalNearby >= 2;
 
-    console.log(`📍 Availability check: ${totalNearby} riders within ${RADIUS_KM}km of pickup (hasCoords=${hasPickupCoords})`);
+    console.log(`✅ Available Vehicles: [${availableVehicles.join(', ')}] | Total online riders: ${totalNearby}`);
+    console.log('='.repeat(50) + '\n');
 
     res.json({
       success: true,
@@ -157,8 +157,7 @@ exports.checkAvailability = async (req, res) => {
       sharedAvailable,
       personalAvailable,
       totalNearbyRiders: totalNearby,
-      radiusKm: RADIUS_KM,
-      hasPickupCoords
+      hasPickupCoords,
     });
   } catch (error) {
     console.error('Error checking availability:', error);

@@ -125,6 +125,13 @@ exports.updateAvailability = async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
+    // 🚀 Console: Log availability update attempt
+    console.log('\n🔄 === RIDER AVAILABILITY UPDATE ===');
+    console.log(`👤 Rider ID: ${riderId}`);
+    console.log(`📊 Status: ${isOnline ? '🟢 ONLINE' : '🔴 OFFLINE'}`);
+    console.log(`📍 Location: ${currentLocation || 'NOT PROVIDED'}`);
+    console.log(`⏰ Time: ${new Date().toLocaleString()}`);
+
     let query, params;
 
     if (currentLocation) {
@@ -132,7 +139,7 @@ exports.updateAvailability = async (req, res) => {
         UPDATE riders 
         SET is_online = $1, current_location = $2, updated_at = CURRENT_TIMESTAMP
         WHERE id = $3
-        RETURNING is_online, current_location
+        RETURNING id, first_name, last_name, is_online, current_location, vehicle_type
       `;
       params = [isOnline, currentLocation, riderId];
     } else {
@@ -140,7 +147,7 @@ exports.updateAvailability = async (req, res) => {
         UPDATE riders 
         SET is_online = $1, updated_at = CURRENT_TIMESTAMP
         WHERE id = $2
-        RETURNING is_online, current_location
+        RETURNING id, first_name, last_name, is_online, current_location, vehicle_type
       `;
       params = [isOnline, riderId];
     }
@@ -148,17 +155,26 @@ exports.updateAvailability = async (req, res) => {
     const result = await pool.query(query, params);
 
     if (result.rows.length === 0) {
+      console.log('❌ Rider not found');
+      console.log('='.repeat(50) + '\n');
       return res.status(404).json({ error: 'Rider not found' });
     }
 
+    const rider = result.rows[0];
+    console.log('✅ Update Successful!');
+    console.log(`   Name: ${rider.first_name} ${rider.last_name}`);
+    console.log(`   Vehicle: ${rider.vehicle_type || 'NOT SET'}`);
+    console.log(`   Status: ${rider.is_online ? '🟢 ONLINE' : '🔴 OFFLINE'}`);
+    console.log('='.repeat(50) + '\n');
+
     res.json({
       success: true,
-      isOnline: result.rows[0].is_online,
-      currentLocation: result.rows[0].current_location
+      isOnline: rider.is_online,
+      currentLocation: rider.current_location
     });
 
   } catch (error) {
-    console.error('Error updating availability:', error);
+    console.error('❌ Error updating availability:', error);
     res.status(500).json({ error: 'Failed to update availability' });
   }
 };

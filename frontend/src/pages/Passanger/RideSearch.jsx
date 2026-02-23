@@ -109,13 +109,43 @@ const VEHICLE_META = {
 };
 
 // ─── Vehicle card ─────────────────────────────────────────────────────────────
+function RiderAvatar({ rider, size = "sm" }) {
+  const dim = size === "sm" ? "w-9 h-9 text-xs" : "w-11 h-11 text-sm";
+  if (rider.profilePhoto) {
+    return (
+      <img
+        src={rider.profilePhoto}
+        alt={rider.name}
+        className={`${dim} rounded-full object-cover ring-2 ring-white shrink-0`}
+      />
+    );
+  }
+  const initials = rider.name ? rider.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() : "?";
+  return (
+    <div className={`${dim} rounded-full bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center font-bold text-white ring-2 ring-white shrink-0`}>
+      {initials}
+    </div>
+  );
+}
+
+function StarRating({ rating }) {
+  const r = parseFloat(rating) || 5.0;
+  return (
+    <span className="flex items-center gap-0.5 text-amber-400 text-xs font-bold">
+      ★ {r.toFixed(1)}
+    </span>
+  );
+}
+
 function VehicleCard({ vehicle, fare, isAvailable, isSelected, onSelect, riderCount, nearestRiders }) {
   const meta = VEHICLE_META[vehicle.id] || {};
+  const topRider = nearestRiders && nearestRiders.length > 0 ? nearestRiders[0] : null;
+
   return (
     <button
       disabled={!isAvailable}
       onClick={onSelect}
-      className={`w-full text-left rounded-2xl border-2 p-5 transition-all duration-200 outline-none ${
+      className={`w-full text-left rounded-2xl border-2 transition-all duration-200 outline-none overflow-hidden ${
         isSelected
           ? "border-transparent bg-linear-to-br from-blue-600 via-purple-600 to-purple-700 text-white shadow-2xl shadow-blue-500/30 scale-[1.01]"
           : isAvailable
@@ -123,12 +153,12 @@ function VehicleCard({ vehicle, fare, isAvailable, isSelected, onSelect, riderCo
           : "border-slate-100 bg-slate-50/60 opacity-40 cursor-not-allowed"
       }`}
     >
-      <div className="flex items-center gap-4">
-        <div
-          className={`w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shrink-0 ${
-            isSelected ? "bg-white/15" : "bg-linear-to-br from-blue-50 to-purple-50"
-          }`}
-        >
+      {/* ── Main row ── */}
+      <div className="flex items-center gap-4 p-5">
+        {/* Vehicle icon */}
+        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shrink-0 ${
+          isSelected ? "bg-white/15" : "bg-linear-to-br from-blue-50 to-purple-50"
+        }`}>
           {meta.icon}
         </div>
 
@@ -136,46 +166,28 @@ function VehicleCard({ vehicle, fare, isAvailable, isSelected, onSelect, riderCo
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-lg font-bold">{vehicle.name}</span>
             {meta.tag && (
-              <span
-                className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                  isSelected ? "bg-white/20 text-white" : meta.tagColor
-                }`}
-              >
+              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                isSelected ? "bg-white/20 text-white" : meta.tagColor
+              }`}>
                 {meta.tag}
               </span>
             )}
-            {/* Rider availability badge */}
-            {riderCount != null && (
-              riderCount > 0 ? (
-                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                  isSelected ? "bg-white/20 text-green-200" : "bg-emerald-100 text-emerald-700"
-                }`}>
-                  {riderCount} rider{riderCount !== 1 ? "s" : ""} nearby
-                </span>
-              ) : (
-                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-600">
-                  No riders nearby
-                </span>
-              )
-            )}
-            {!isAvailable && riderCount == null && (
+            {/* Availability badge */}
+            {isAvailable ? (
+              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                isSelected ? "bg-white/20 text-green-200" : "bg-emerald-100 text-emerald-700"
+              }`}>
+                {riderCount != null ? `${riderCount} online` : "Available"}
+              </span>
+            ) : (
               <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-600">
-                Unavailable
+                No riders
               </span>
             )}
           </div>
-          <p className={`text-sm mt-0.5 ${
-            isSelected ? "text-white/70" : "text-slate-500"
-          }`}>
-            Up to {vehicle.capacity} passenger{vehicle.capacity > 1 ? "s" : ""} •{" "}
-            {meta.etaMin}–{meta.etaMax} min ETA
+          <p className={`text-xs mt-0.5 ${isSelected ? "text-white/70" : "text-slate-500"}`}>
+            Up to {vehicle.capacity} passenger{vehicle.capacity > 1 ? "s" : ""} · {meta.etaMin}–{meta.etaMax} min ETA
           </p>
-          {/* Show nearest rider name + distance when available */}
-          {isAvailable && !isSelected && nearestRiders && nearestRiders.length > 0 && nearestRiders[0].distanceKm != null && (
-            <p className="text-xs text-blue-600 font-semibold mt-1">
-              Nearest: {nearestRiders[0].name || "Rider"} · {nearestRiders[0].distanceKm} km away
-            </p>
-          )}
         </div>
 
         <div className="text-right shrink-0">
@@ -190,6 +202,45 @@ function VehicleCard({ vehicle, fare, isAvailable, isSelected, onSelect, riderCo
           )}
         </div>
       </div>
+
+      {/* ── Rider info strip (only when available and rider data exists) ── */}
+      {isAvailable && topRider && (
+        <div className={`mx-5 mb-4 rounded-xl px-4 py-3 flex items-center gap-3 ${
+          isSelected ? "bg-white/10" : "bg-slate-50 border border-slate-100"
+        }`}>
+          <RiderAvatar rider={topRider} />
+          <div className="flex-1 min-w-0">
+            <p className={`text-sm font-bold truncate ${isSelected ? "text-white" : "text-slate-800"}`}>
+              {topRider.name || "Driver"}
+            </p>
+            <p className={`text-xs truncate ${isSelected ? "text-white/70" : "text-slate-500"}`}>
+              {[topRider.vehicleModel, topRider.vehicleColor].filter(Boolean).join(" · ") || "Vehicle details pending"}
+            </p>
+          </div>
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            <StarRating rating={topRider.rating} />
+            {topRider.distanceKm != null && (
+              <span className={`text-[11px] font-semibold ${isSelected ? "text-white/70" : "text-blue-600"}`}>
+                {topRider.distanceKm} km away
+              </span>
+            )}
+            {topRider.vehiclePlate && (
+              <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                isSelected ? "bg-white/20 text-white" : "bg-slate-200 text-slate-600"
+              }`}>
+                {topRider.vehiclePlate}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Extra riders count ── */}
+      {isAvailable && riderCount != null && riderCount > 1 && (
+        <p className={`px-5 pb-3 text-xs ${isSelected ? "text-white/60" : "text-slate-400"}`}>
+          +{riderCount - 1} more driver{riderCount - 1 > 1 ? "s" : ""} available
+        </p>
+      )}
     </button>
   );
 }
@@ -297,6 +348,7 @@ export default function RideSearch() {
   const [passengers, setPassengers] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [locationLoading, setLocationLoading] = useState(true);
+  const [locationError, setLocationError] = useState(null);
   const [mapCenter, setMapCenter] = useState([20.5937, 78.9629]); // India default
   const [searchResults, setSearchResults] = useState(null);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
@@ -386,63 +438,95 @@ export default function RideSearch() {
       socket.disconnect();
     };
   }, [step, booked?.rideId]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (!navigator.geolocation) { setLocationLoading(false); return; }
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude: lat, longitude: lon } = pos.coords;
-        setMapCenter([lat, lon]);
-        setPickupCoords({ lat, lng: lon });
-        try {
-          const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
-          const res = await fetch(`${API_BASE_URL}/geocoding/reverse?lat=${lat}&lon=${lon}`);
-          if (res.ok) {
-            const data = await res.json();
-            const addr = data.place?.address || {};
-            const parts = [];
-            if (addr.road) parts.push(addr.road);
-            if (addr.suburb || addr.neighbourhood) parts.push(addr.suburb || addr.neighbourhood);
-            if (addr.city || addr.town || addr.village) parts.push(addr.city || addr.town || addr.village);
-            if (parts.length > 0) setPickup(parts.join(", "));
-            else if (data.place?.display_name) setPickup(data.place.display_name);
-          }
-        } catch {
-          setPickup(`${lat.toFixed(4)}, ${lon.toFixed(4)}`);
-        }
-        setLocationLoading(false);
-      },
-      () => setLocationLoading(false),
-      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
-    );
+  // ── Shared reverse-geocode helper (same logic as Landing.jsx findNearestPlace) ──
+  const resolveAddress = useCallback(async (lat, lon) => {
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
+      const res = await fetch(`${API_BASE_URL}/geocoding/reverse?lat=${lat}&lon=${lon}`);
+      if (!res.ok) throw new Error("reverse geocode failed");
+      const data = await res.json();
+      const place = data.place || {};
+      const addr  = place.address || {};
+
+      // 1. Prefer specific place name (landmark / building) if it differs from display_name
+      if (place.name && place.name !== place.display_name) return place.name;
+
+      // 2. Build from address components (same order as Landing.jsx)
+      const parts = [];
+      if (addr.building)                         parts.push(addr.building);
+      if (addr.road)                             parts.push(addr.road);
+      if (addr.suburb || addr.neighbourhood)     parts.push(addr.suburb || addr.neighbourhood);
+      if (addr.city   || addr.town || addr.village) parts.push(addr.city || addr.town || addr.village);
+      if (parts.length > 0) return parts.join(", ");
+
+      // 3. Fallback to full display name
+      if (place.display_name) return place.display_name;
+    } catch { /* ignore, fall through */ }
+
+    // 4. Last resort: raw coordinates
+    return `Location (${lat.toFixed(6)}, ${lon.toFixed(6)})`;
   }, []);
 
-  const handleGetCurrentLocation = () => {
-    if (!navigator.geolocation) return;
-    setLocationLoading(true);
+  // ── Auto-detect location on mount ────────────────────────────────────────────
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setLocationError("Geolocation is not supported by your browser.");
+      setLocationLoading(false);
+      return;
+    }
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const { latitude: lat, longitude: lon } = pos.coords;
         setMapCenter([lat, lon]);
         setPickupCoords({ lat, lng: lon });
-        try {
-          const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
-          const res = await fetch(`${API_BASE_URL}/geocoding/reverse?lat=${lat}&lon=${lon}`);
-          if (res.ok) {
-            const data = await res.json();
-            const addr = data.place?.address || {};
-            const parts = [];
-            if (addr.road) parts.push(addr.road);
-            if (addr.suburb || addr.neighbourhood) parts.push(addr.suburb || addr.neighbourhood);
-            if (addr.city || addr.town || addr.village) parts.push(addr.city || addr.town || addr.village);
-            if (parts.length > 0) setPickup(parts.join(", "));
-            else if (data.place?.display_name) setPickup(data.place.display_name);
-          }
-        } catch { /* ignore */ }
+        setLocationError(null);
+        const label = await resolveAddress(lat, lon);
+        setPickup(label);
         setLocationLoading(false);
       },
-      () => setLocationLoading(false)
+      (err) => {
+        let msg;
+        switch (err.code) {
+          case err.PERMISSION_DENIED:  msg = "Location access denied. Enter your pickup manually."; break;
+          case err.POSITION_UNAVAILABLE: msg = "Location unavailable. Enter your pickup manually."; break;
+          case err.TIMEOUT:            msg = "Location timed out. Enter your pickup manually.";    break;
+          default:                     msg = "Unable to detect location. Enter your pickup manually.";
+        }
+        setLocationError(msg);
+        setLocationLoading(false);
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
     );
-  };
+  }, [resolveAddress]);
+
+  // ── Manual crosshair button ───────────────────────────────────────────────────
+  const handleGetCurrentLocation = useCallback(() => {
+    if (!navigator.geolocation) return;
+    setLocationLoading(true);
+    setLocationError(null);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude: lat, longitude: lon } = pos.coords;
+        setMapCenter([lat, lon]);
+        setPickupCoords({ lat, lng: lon });
+        const label = await resolveAddress(lat, lon);
+        setPickup(label);
+        setLocationLoading(false);
+      },
+      (err) => {
+        let msg;
+        switch (err.code) {
+          case err.PERMISSION_DENIED:  msg = "Location access denied."; break;
+          case err.POSITION_UNAVAILABLE: msg = "Location unavailable."; break;
+          case err.TIMEOUT:            msg = "Location timed out.";    break;
+          default:                     msg = "Unable to detect location.";
+        }
+        setLocationError(msg);
+        setLocationLoading(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  }, [resolveAddress]);
 
   const [pickupSuggestions, setPickupSuggestions] = useState([]);
   const [destSuggestions, setDestSuggestions] = useState([]);
@@ -559,6 +643,30 @@ export default function RideSearch() {
       const distance = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       // Pass geocoded pickup coords so backend can filter riders within 2 km
       const availability = await ridesAPI.checkAvailability(pickup, destination, distance.toFixed(2), pLat, pLon);
+      
+      // 🚀 Console: Log rider availability information
+      console.group('🚗 Rider Availability Check');
+      console.log('📍 Total Riders Online Nearby:', availability.totalNearbyRiders || 0);
+      console.log('📏 Search Radius:', availability.radiusKm || 2, 'km');
+      console.log('🎯 Has Pickup Coords:', availability.hasPickupCoords || false);
+      console.log('✅ Available Vehicles:', availability.availableVehicles || []);
+      console.log('🚙 Vehicle Breakdown:', availability.vehicleAvailability || {});
+      console.log('👤 Personal Rides Available:', availability.personalAvailable);
+      console.log('👥 Shared Rides Available:', availability.sharedAvailable);
+      
+      // Show per-vehicle rider counts
+      if (availability.vehicleAvailability) {
+        console.group('📊 Riders by Vehicle Type:');
+        ['bike', 'auto', 'car', 'suv'].forEach(type => {
+          const vData = availability.vehicleAvailability[type];
+          if (vData) {
+            console.log(`  ${type.toUpperCase()}: ${vData.count} rider(s)`, vData.riders || []);
+          }
+        });
+        console.groupEnd();
+      }
+      console.groupEnd();
+      
       setSearchResults({
         distance: distance.toFixed(2),
         availableVehicles: availability.availableVehicles || [],
@@ -781,31 +889,36 @@ export default function RideSearch() {
 
                 <form onSubmit={handleSearch} className="space-y-4">
                   {/* Pickup */}
-                  <div className="relative" ref={pickupRef}>
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-emerald-200 pointer-events-none" />
-                    <input
-                      type="text"
-                      value={pickup}
-                      onChange={(e) => setPickup(e.target.value)}
-                      onFocus={() => pickupSuggestions.length > 0 && setShowPickupSugg(true)}
-                      placeholder={locationLoading ? "Detecting your location..." : "Pickup location"}
-                      required
-                      className="w-full py-4 pl-10 pr-10 border-2 border-slate-200 rounded-xl focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 text-sm transition bg-white/70 text-slate-800 placeholder-slate-400"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleGetCurrentLocation}
-                      title="Use my current location"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-lg hover:bg-blue-50 transition text-slate-400 hover:text-blue-600"
-                    >
-                      {locationLoading || pickupSearching ? (
-                        <Loader className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Crosshair className="w-4 h-4" />
-                      )}
-                    </button>
-                    {/* Pickup suggestion dropdown */}
-                    {showPickupSugg && pickupSuggestions.length > 0 && (
+                  <div ref={pickupRef}>
+                    <div className="relative">
+                      <div className="absolute left-4 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-emerald-200 pointer-events-none" />
+                      <input
+                        type="text"
+                        value={pickup}
+                        onChange={(e) => { setPickup(e.target.value); setLocationError(null); }}
+                        onFocus={() => pickupSuggestions.length > 0 && setShowPickupSugg(true)}
+                        placeholder={locationLoading ? "📍 Detecting your location..." : "Pickup location"}
+                        required
+                        className={`w-full py-4 pl-10 pr-10 border-2 rounded-xl focus:outline-none focus:ring-2 text-sm transition bg-white/70 text-slate-800 placeholder-slate-400 ${
+                          locationError
+                            ? "border-amber-300 focus:border-amber-400 focus:ring-amber-100"
+                            : "border-slate-200 focus:border-blue-400 focus:ring-blue-100"
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleGetCurrentLocation}
+                        title="Use my current location"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-lg hover:bg-blue-50 transition text-slate-400 hover:text-blue-600"
+                      >
+                        {locationLoading || pickupSearching ? (
+                          <Loader className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Crosshair className="w-4 h-4" />
+                        )}
+                      </button>
+                      {/* Pickup suggestion dropdown */}
+                      {showPickupSugg && pickupSuggestions.length > 0 && (
                       <ul className="absolute z-50 top-full left-0 right-0 mt-1.5 bg-white rounded-2xl shadow-2xl shadow-blue-500/15 border border-slate-200 overflow-hidden">
                         {pickupSuggestions.map((s, i) => (
                           <li key={i}>
@@ -830,7 +943,14 @@ export default function RideSearch() {
                         ))}
                       </ul>
                     )}
-                  </div>
+                    </div>{/* end inner relative */}
+                    {/* Location error / permission hint */}
+                    {locationError && (
+                      <p className="mt-1.5 flex items-center gap-1.5 text-xs text-amber-600 font-medium px-1">
+                        <span>⚠️</span> {locationError}
+                      </p>
+                    )}
+                  </div>{/* end pickupRef */}
 
                   {/* Swap divider */}
                   <div className="relative flex items-center">
@@ -932,23 +1052,20 @@ export default function RideSearch() {
                       {searchResults.distance} km
                     </span>
                     <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${searchResults.personalAvailable ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-                      {searchResults.hasPickupCoords
-                        ? `${searchResults.totalNearbyRiders} rider${searchResults.totalNearbyRiders !== 1 ? 's' : ''} within ${searchResults.radiusKm}km`
-                        : searchResults.personalAvailable ? "Riders online" : "No riders online"}
+                      {searchResults.personalAvailable
+                        ? `${searchResults.totalNearbyRiders} rider${searchResults.totalNearbyRiders !== 1 ? 's' : ''} online`
+                        : "No riders online"}
                     </span>
                   </div>
                 </div>
 
                 <div className="p-6 space-y-3">
                   {vehicleOptions.map((vehicle) => {
-                    // All vehicles are always selectable — isAvailable only gates
-                    // the book button (via personalAvailable), not selection itself
                     const vData = searchResults.vehicleAvailability?.[vehicle.id];
-                    // If we have per-vehicle data from nearby search, use it;
-                    // otherwise fall back to true so selection is never blocked
-                    const hasNearbyData = searchResults.hasPickupCoords && vData != null;
-                    const isAvailable = hasNearbyData ? vData.count > 0 : true;
-                    const riderCount = hasNearbyData ? vData.count : null;
+                    // Use the backend's availableVehicles array as the source of truth
+                    const isAvailable = searchResults.availableVehicles.includes(vehicle.id);
+                    // Always show rider count from vData (backend now returns all online riders)
+                    const riderCount = vData != null ? vData.count : null;
                     const nearestRiders = vData?.riders || [];
                     const fare = vehicle.baseRate + vehicle.perKm * parseFloat(searchResults.distance);
                     return (

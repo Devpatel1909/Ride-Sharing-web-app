@@ -52,7 +52,12 @@ export default function RiderDashboard() {
         });
 
         newSocket.on('connect', () => {
-          console.log('✅ Socket connected:', newSocket.id);
+          console.group('🔌 Socket.IO Connected');
+          console.log('Socket ID:', newSocket.id);
+          console.log('Rider ID:', riderData.id);
+          console.log('Name:', `${riderData.firstName} ${riderData.lastName}`);
+          console.log('Status: Ready to receive ride requests ✅');
+          console.groupEnd();
           // Join rider room
           newSocket.emit('rider-online', riderData.id);
         });
@@ -205,7 +210,18 @@ export default function RiderDashboard() {
       if (statsData.stats && typeof statsData.stats.isOnline === 'boolean') {
         setIsOnline(statsData.stats.isOnline);
         localStorage.setItem('riderIsOnline', statsData.stats.isOnline.toString());
-        console.log('🔄 Online status synced from database:', statsData.stats.isOnline);
+        
+        // 🚀 Console: Log dashboard data load
+        console.group('📊 Rider Dashboard Data Loaded');
+        console.log(`Status: ${statsData.stats.isOnline ? '🟢 ONLINE' : '🔴 OFFLINE'}`);
+        console.log('📈 Stats:', {
+          totalRides: statsData.stats.totalRides || 0,
+          totalEarnings: statsData.stats.totalEarnings || 0,
+          rating: statsData.stats.rating || 5.0
+        });
+        console.log('📍 Current Location:', currentLocation || 'NOT SET');
+        console.log('🔔 Pending Requests:', requestsData.requests?.length || 0);
+        console.groupEnd();
       }
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
@@ -226,11 +242,20 @@ export default function RiderDashboard() {
   const handleToggleAvailability = async () => {
     try {
       const newStatus = !isOnline;
+      
+      // 🚀 Console: Log status change attempt
+      console.group(`🔄 Toggling Online Status: ${isOnline ? 'ONLINE' : 'OFFLINE'} → ${newStatus ? 'ONLINE' : 'OFFLINE'}`);
+      console.log('📍 Current Location:', currentLocation || 'NOT SET');
+      console.log('📅 Time:', new Date().toLocaleTimeString());
+      
       await riderAPI.updateAvailability(newStatus, currentLocation);
       setIsOnline(newStatus);
       // Persist to localStorage
       localStorage.setItem('riderIsOnline', newStatus.toString());
-      console.log('💾 Online status saved:', newStatus);
+      
+      console.log('✅ Status Update Successful!');
+      console.log('💾 Saved to localStorage:', newStatus);
+      console.groupEnd();
       
       if (newStatus) {
         alert('✅ You are now ONLINE and ready to receive ride requests!');
@@ -238,7 +263,7 @@ export default function RiderDashboard() {
         alert('⭕ You are now OFFLINE. You will not receive new ride requests.');
       }
     } catch (error) {
-      console.error('Failed to update availability:', error);
+      console.error('❌ Failed to update availability:', error);
       alert('Failed to update availability status');
     }
   };
