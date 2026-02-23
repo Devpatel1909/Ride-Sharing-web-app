@@ -116,7 +116,7 @@ exports.checkAvailability = async (req, res) => {
       matching.sort((a, b) => (a.distanceKm ?? 99) - (b.distanceKm ?? 99));
       vehicleAvailability[v] = {
         count: matching.length,
-        riders: matching.slice(0, 3).map(r => ({
+        riders: matching.map(r => ({
           id: r.id,
           name: `${r.first_name || ''} ${r.last_name || ''}`.trim(),
           vehicleModel: r.vehicle_model || '',
@@ -181,7 +181,8 @@ exports.bookRide = async (req, res) => {
       fare, 
       rideType, 
       vehicleType,
-      pickupCoordinates // { lat, lng }
+      pickupCoordinates, // { lat, lng }
+      selectedRiderId    // optional: passenger-chosen rider
     } = req.body;
 
     if (!pickup || !destination || !distance || !fare || !rideType || !vehicleType) {
@@ -227,11 +228,23 @@ exports.bookRide = async (req, res) => {
     const passengerName = passengerResult.rows[0]?.full_name || 'Unknown';
     const passengerPhone = passengerResult.rows[0]?.phone || '';
 
-    // Find online riders within 1km radius
+    // Find riders to notify
     let nearbyRiders = [];
-    
-    if (pickupLat && pickupLng) {
-      // Get all online riders with their locations
+
+    // If passenger selected a specific rider, notify only that rider
+    if (selectedRiderId) {
+      const specificRiderQuery = `
+        SELECT id, first_name, last_name, current_location
+        FROM riders
+        WHERE id = $1 AND is_online = true
+      `;
+      const specificResult = await pool.query(specificRiderQuery, [selectedRiderId]);
+      if (specificResult.rows.length > 0) {
+        const r = specificResult.rows[0];
+        nearbyRiders = [{ id: r.id, name: `${r.first_name} ${r.last_name}`, distance: 'selected' }];
+      }
+    } else if (pickupLat && pickupLng) {
+      // Find online riders within 5km radius (wider net)
       const ridersQuery = `
         SELECT 
           id, 
@@ -251,7 +264,6 @@ exports.bookRide = async (req, res) => {
 
       const ridersResult = await pool.query(ridersQuery, [vehicleType]);
       
-      // Calculate distance for each rider
       ridersResult.rows.forEach(rider => {
         if (rider.current_location) {
           const riderCoords = parseLocation(rider.current_location);
@@ -262,26 +274,31 @@ exports.bookRide = async (req, res) => {
               riderCoords.lat, 
               riderCoords.lng
             );
-            
-            // Only include riders within 1km
-            if (distanceToRider <= 1.0) {
+            // Notify all riders within 5km
+            if (distanceToRider <= 5.0) {
               nearbyRiders.push({
                 id: rider.id,
                 name: `${rider.first_name} ${rider.last_name}`,
                 distance: distanceToRider.toFixed(2)
               });
             }
+          } else {
+            // No parseable location — still notify
+            nearbyRiders.push({ id: rider.id, name: `${rider.first_name} ${rider.last_name}`, distance: 'unknown' });
           }
+        } else {
+          // No location set — still notify
+          nearbyRiders.push({ id: rider.id, name: `${rider.first_name} ${rider.last_name}`, distance: 'unknown' });
         }
       });
     } else {
-      // If coordinates not available, fall back to all online riders
+      // Fallback: notify all online riders of that vehicle type
       const ridersQuery = `
         SELECT id, first_name, last_name
         FROM riders
         WHERE is_online = true
         AND vehicle_type = $1
-        LIMIT 10
+        LIMIT 20
       `;
       const ridersResult = await pool.query(ridersQuery, [vehicleType]);
       nearbyRiders = ridersResult.rows.map(r => ({

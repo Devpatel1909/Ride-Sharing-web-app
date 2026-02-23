@@ -17,6 +17,7 @@ import {
   PlayCircle,
   Flag,
   Clock,
+  ExternalLink,
 } from "lucide-react";
 import Header from "../components/common/Header";
 import { riderAPI } from "../services/api";
@@ -102,12 +103,16 @@ const destPinIcon = new L.DivIcon({
 });
 
 // Auto-fit/pan map when locations change
-function LiveMapController({ riderLoc, passengerLoc, pickupCoords, destCoords }) {
+function LiveMapController({ riderLoc, passengerLoc, pickupCoords, destCoords, rideStatus }) {
   const map = useMap();
   const fitted = useRef(false);
 
   useEffect(() => {
-    const pts = [riderLoc, passengerLoc, pickupCoords, destCoords]
+    // When in-progress: fit rider + destination; otherwise fit all points
+    const pts = (rideStatus === "in-progress"
+      ? [riderLoc, destCoords]
+      : [riderLoc, passengerLoc, pickupCoords, destCoords]
+    )
       .filter(Boolean)
       .map((p) => [p.lat, p.lng]);
 
@@ -118,7 +123,7 @@ function LiveMapController({ riderLoc, passengerLoc, pickupCoords, destCoords })
       map.setView(pts[0], 15);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [riderLoc?.lat, riderLoc?.lng, passengerLoc?.lat, passengerLoc?.lng]);
+  }, [riderLoc?.lat, riderLoc?.lng, passengerLoc?.lat, passengerLoc?.lng, rideStatus]);
 
   return null;
 }
@@ -248,19 +253,21 @@ export default function TrackingMap() {
   const riderLoc  = role === "rider"  ? myLocation  : otherLocation;
   const passengerLoc = role === "passenger" ? myLocation : otherLocation;
 
-  // ── Live distance between rider & passenger (Haversine) ──────────────────
+  // ── Live distance: to passenger when accepted, to destination when in-progress ──
   useEffect(() => {
-    if (!riderLoc || !passengerLoc) { setLiveDistance(null); return; }
+    const from = riderLoc;
+    const to   = rideStatus === "in-progress" ? destCoords : passengerLoc;
+    if (!from || !to) { setLiveDistance(null); return; }
     const R = 6371;
-    const dLat = ((passengerLoc.lat - riderLoc.lat) * Math.PI) / 180;
-    const dLon = ((passengerLoc.lng - riderLoc.lng) * Math.PI) / 180;
+    const dLat = ((to.lat - from.lat) * Math.PI) / 180;
+    const dLon = ((to.lng - from.lng) * Math.PI) / 180;
     const a =
       Math.sin(dLat / 2) ** 2 +
-      Math.cos((riderLoc.lat * Math.PI) / 180) *
-        Math.cos((passengerLoc.lat * Math.PI) / 180) *
+      Math.cos((from.lat * Math.PI) / 180) *
+        Math.cos((to.lat * Math.PI) / 180) *
         Math.sin(dLon / 2) ** 2;
     setLiveDistance(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
-  }, [riderLoc?.lat, riderLoc?.lng, passengerLoc?.lat, passengerLoc?.lng]); // eslint-disable-line
+  }, [riderLoc?.lat, riderLoc?.lng, passengerLoc?.lat, passengerLoc?.lng, destCoords?.lat, destCoords?.lng, rideStatus]); // eslint-disable-line
 
   // ── Fetch real road route (OSRM) when rider or other party location updates ─
   const lastRouteFetch = useRef({ rLat: null, rLng: null });
@@ -268,9 +275,10 @@ export default function TrackingMap() {
   useEffect(() => {
     if (!riderLoc) return;
 
-    // Choose destination: passenger location while going to pick up, dest when in-progress
+    // When in-progress: route to destination
+    // When accepted (going to pick up): route to passenger location
     const target = rideStatus === "in-progress"
-      ? (destCoords || passengerLoc)
+      ? destCoords
       : (passengerLoc || destCoords);
 
     if (!target) return;
@@ -296,6 +304,13 @@ export default function TrackingMap() {
       })
       .catch(() => {}); // Silently fall back to straight line
   }, [riderLoc?.lat, riderLoc?.lng, passengerLoc?.lat, passengerLoc?.lng, rideStatus]); // eslint-disable-line
+
+  // ── Google Maps navigation link ─────────────────────────────────────
+  const googleMapsUrl = destCoords
+    ? `https://www.google.com/maps/dir/?api=1&destination=${destCoords.lat},${destCoords.lng}&travelmode=driving`
+    : destination
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destination)}`
+      : null;
 
   // ── Rider status change handler ───────────────────────────────────────────
   const handleStatusChange = useCallback(async (newStatus) => {
@@ -328,8 +343,8 @@ export default function TrackingMap() {
   };
 
   const statusLabel = {
-    accepted:    "Rider on the way",
-    "in-progress": "Ride in progress",
+    accepted:    "Rider on the way to pickup",
+    "in-progress": "En route to destination",
     completed:   "Ride completed",
   };
 
@@ -350,7 +365,7 @@ export default function TrackingMap() {
       <Header />
 
       {/* ── Info bar ──────────────────────────────────────────────────────── */}
-      <div className="fixed top-16 left-0 right-0 z-40 px-4 py-3 border-b shadow-md bg-white/95 backdrop-blur-sm border-slate-200">
+      <div className="fixed left-0 right-0 z-40 px-4 py-3 border-b shadow-md top-16 bg-white/95 backdrop-blur-sm border-slate-200">
         <div className="flex flex-wrap items-center justify-between max-w-5xl gap-3 mx-auto">
           {/* Left: ride status */}
           <div className="flex items-center gap-3">
@@ -368,12 +383,26 @@ export default function TrackingMap() {
             </span>
           </div>
 
-          {/* Right: connection status */}
-          <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${socketConnected ? "bg-emerald-500 animate-pulse" : "bg-red-400"}`} />
-            <span className="text-xs font-semibold text-slate-500">
-              {socketConnected ? "Live" : "Connecting…"}
-            </span>
+          {/* Right: navigate button (in-progress) or connection status */}
+          <div className="flex items-center gap-3">
+            {rideStatus === "in-progress" && googleMapsUrl && (
+              <a
+                href={googleMapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white rounded-xl bg-linear-to-r from-blue-600 to-purple-600 hover:opacity-90 transition"
+              >
+                <Navigation className="w-3.5 h-3.5" />
+                Navigate
+                <ExternalLink className="w-3 h-3 opacity-70" />
+              </a>
+            )}
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${socketConnected ? "bg-emerald-500 animate-pulse" : "bg-red-400"}`} />
+              <span className="text-xs font-semibold text-slate-500">
+                {socketConnected ? "Live" : "Connecting…"}
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -396,13 +425,14 @@ export default function TrackingMap() {
             passengerLoc={passengerLoc}
             pickupCoords={pickupCoords}
             destCoords={destCoords}
+            rideStatus={rideStatus}
           />
 
           {/* ── Pickup pin ───────────────────────────────────────── */}
           {pickupCoords && (
             <Marker position={[pickupCoords.lat, pickupCoords.lng]} icon={pickupPinIcon}>
               <Popup>
-                <div className="text-center py-1">
+                <div className="py-1 text-center">
                   <span className="font-bold text-emerald-700">📍 Pickup</span>
                   {pickup && <p className="text-xs text-slate-500 mt-0.5 max-w-40">{pickup}</p>}
                 </div>
@@ -414,7 +444,7 @@ export default function TrackingMap() {
           {destCoords && (
             <Marker position={[destCoords.lat, destCoords.lng]} icon={destPinIcon}>
               <Popup>
-                <div className="text-center py-1">
+                <div className="py-1 text-center">
                   <span className="font-bold text-red-600">🏁 Destination</span>
                   {destination && <p className="text-xs text-slate-500 mt-0.5 max-w-40">{destination}</p>}
                 </div>
@@ -426,9 +456,9 @@ export default function TrackingMap() {
           {riderLoc && (
             <Marker position={[riderLoc.lat, riderLoc.lng]} icon={riderIcon}>
               <Popup>
-                <div className="text-center py-1">
+                <div className="py-1 text-center">
                   <span className="font-bold text-blue-700">🚗 {role === "rider" ? "You (Rider)" : (riderName || "Rider")}</span>
-                  {vehicleType && <p className="text-xs text-slate-500 mt-1">{vehicleType}{vehiclePlate ? ` · ${vehiclePlate}` : ""}</p>}
+                  {vehicleType && <p className="mt-1 text-xs text-slate-500">{vehicleType}{vehiclePlate ? ` · ${vehiclePlate}` : ""}</p>}
                 </div>
               </Popup>
             </Marker>
@@ -438,7 +468,7 @@ export default function TrackingMap() {
           {passengerLoc && (
             <Marker position={[passengerLoc.lat, passengerLoc.lng]} icon={passengerIcon}>
               <Popup>
-                <div className="text-center py-1">
+                <div className="py-1 text-center">
                   <span className="font-bold text-emerald-700">👤 {role === "passenger" ? "You" : "Passenger"}</span>
                 </div>
               </Popup>
@@ -455,27 +485,27 @@ export default function TrackingMap() {
                 weight={8}
                 opacity={0.55}
               />
-              {/* Solid gradient-like route */}
+              {/* Solid route — blue when picking up, green when in-progress */}
               <Polyline
                 positions={routeCoords}
-                color="#4f46e5"
+                color={rideStatus === "in-progress" ? "#10b981" : "#4f46e5"}
                 weight={5}
-                opacity={0.88}
+                opacity={0.9}
               />
             </>
           ) : (
             /* Fallback straight dashed line when OSRM not yet loaded */
-            riderLoc && passengerLoc && (
+            riderLoc && (passengerLoc || destCoords) && (
               <>
                 <Polyline
-                  positions={[[riderLoc.lat, riderLoc.lng], [passengerLoc.lat, passengerLoc.lng]]}
+                  positions={[[riderLoc.lat, riderLoc.lng], [(passengerLoc || destCoords).lat, (passengerLoc || destCoords).lng]]}
                   color="#ffffff"
                   weight={6}
                   opacity={0.4}
                 />
                 <Polyline
-                  positions={[[riderLoc.lat, riderLoc.lng], [passengerLoc.lat, passengerLoc.lng]]}
-                  color="#4f46e5"
+                  positions={[[riderLoc.lat, riderLoc.lng], [(passengerLoc || destCoords).lat, (passengerLoc || destCoords).lng]]}
+                  color={rideStatus === "in-progress" ? "#10b981" : "#4f46e5"}
                   weight={3}
                   opacity={0.7}
                   dashArray="10, 8"
@@ -484,7 +514,7 @@ export default function TrackingMap() {
             )
           )}
 
-          {/* ── Faint pickup → destination guide line ────────────── */}
+          {/* ── Full journey line pickup → destination (always shown as guide) ── */}
           {pickupCoords && destCoords && (
             <Polyline
               positions={[
@@ -501,18 +531,18 @@ export default function TrackingMap() {
       </div>
 
       {/* ── Bottom info card ─────────────────────────────────────────────── */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 px-4 pb-4 pt-3 border-t shadow-2xl bg-white/95 backdrop-blur-sm border-slate-200">
+      <div className="fixed bottom-0 left-0 right-0 z-40 px-4 pt-3 pb-4 border-t shadow-2xl bg-white/95 backdrop-blur-sm border-slate-200">
         <div className="max-w-5xl mx-auto">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {/* My location status */}
-            <div className="flex items-center gap-3 p-3 rounded-2xl bg-linear-to-r from-blue-50 to-purple-50 border border-blue-100">
+            <div className="flex items-center gap-3 p-3 border border-blue-100 rounded-2xl bg-linear-to-r from-blue-50 to-purple-50">
               {myLocation ? (
                 <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" />
               ) : (
                 <Loader className="w-5 h-5 text-blue-500 animate-spin shrink-0" />
               )}
               <div>
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Your location</p>
+                <p className="text-xs font-bold tracking-wide uppercase text-slate-500">Your location</p>
                 <p className="text-sm font-semibold text-slate-800">
                   {myLocation ? `${myLocation.lat.toFixed(4)}, ${myLocation.lng.toFixed(4)}` : "Acquiring GPS…"}
                 </p>
@@ -520,14 +550,14 @@ export default function TrackingMap() {
             </div>
 
             {/* Other party status */}
-            <div className="flex items-center gap-3 p-3 rounded-2xl bg-linear-to-r from-emerald-50 to-teal-50 border border-emerald-100">
+            <div className="flex items-center gap-3 p-3 border rounded-2xl bg-linear-to-r from-emerald-50 to-teal-50 border-emerald-100">
               {otherLocation ? (
                 <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" />
               ) : (
                 <Loader className="w-5 h-5 text-emerald-500 animate-spin shrink-0" />
               )}
               <div>
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">{otherLabel}'s location</p>
+                <p className="text-xs font-bold tracking-wide uppercase text-slate-500">{otherLabel}'s location</p>
                 <p className="text-sm font-semibold text-slate-800">
                   {otherLocation
                     ? `${otherLocation.lat.toFixed(4)}, ${otherLocation.lng.toFixed(4)}`
@@ -550,6 +580,20 @@ export default function TrackingMap() {
             </div>
           )}
 
+          {/* ── Navigate to destination button (both rider & passenger when in-progress) ── */}
+          {rideStatus === "in-progress" && googleMapsUrl && (
+            <a
+              href={googleMapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 py-3 mt-3 text-sm font-bold text-white transition shadow-lg rounded-2xl bg-linear-to-r from-blue-600 via-indigo-600 to-purple-700 shadow-blue-500/30 hover:opacity-90 active:scale-95"
+            >
+              <Navigation className="w-4 h-4" />
+              Navigate to Destination
+              <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+            </a>
+          )}
+
           {/* Live distance / ETA between rider and passenger */}
           {liveDistance !== null && (
             <div className="flex items-center gap-4 mt-3 px-4 py-2.5 rounded-2xl bg-linear-to-r from-violet-50 to-blue-50 border border-violet-100">
@@ -558,9 +602,11 @@ export default function TrackingMap() {
                 {liveDistance < 1
                   ? `${Math.round(liveDistance * 1000)} m`
                   : `${liveDistance.toFixed(2)} km`}
-                <span className="font-normal text-slate-400 text-xs ml-1">apart</span>
+                <span className="ml-1 text-xs font-normal text-slate-400">
+                  {rideStatus === "in-progress" ? "to destination" : "to pickup"}
+                </span>
               </div>
-              <div className="flex items-center gap-1 text-sm font-bold text-blue-700 ml-auto">
+              <div className="flex items-center gap-1 ml-auto text-sm font-bold text-blue-700">
                 <Clock className="w-3.5 h-3.5" />
                 {/* ETA based on avg 30 km/h */}
                 {liveDistance < 0.05
@@ -572,8 +618,8 @@ export default function TrackingMap() {
 
           {/* Rider info (shown to passenger) */}
           {role === "passenger" && riderName && (
-            <div className="flex items-center gap-3 p-3 mt-3 rounded-2xl bg-slate-50 border border-slate-200">
-              <div className="flex items-center justify-center w-9 h-9 rounded-full bg-linear-to-br from-blue-600 to-purple-600">
+            <div className="flex items-center gap-3 p-3 mt-3 border rounded-2xl bg-slate-50 border-slate-200">
+              <div className="flex items-center justify-center rounded-full w-9 h-9 bg-linear-to-br from-blue-600 to-purple-600">
                 <Car className="w-5 h-5 text-white" />
               </div>
               <div className="flex-1 min-w-0">
@@ -593,8 +639,8 @@ export default function TrackingMap() {
 
           {/* Passenger info (shown to rider) */}
           {role === "rider" && (
-            <div className="flex items-center gap-3 p-3 mt-3 rounded-2xl bg-slate-50 border border-slate-200">
-              <div className="flex items-center justify-center w-9 h-9 rounded-full bg-linear-to-br from-emerald-500 to-teal-500">
+            <div className="flex items-center gap-3 p-3 mt-3 border rounded-2xl bg-slate-50 border-slate-200">
+              <div className="flex items-center justify-center rounded-full w-9 h-9 bg-linear-to-br from-emerald-500 to-teal-500">
                 <User className="w-5 h-5 text-white" />
               </div>
               <div className="flex-1 min-w-0">
@@ -611,7 +657,7 @@ export default function TrackingMap() {
                 <button
                   onClick={() => handleStatusChange("in-progress")}
                   disabled={isUpdatingStatus}
-                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm text-white bg-linear-to-r from-amber-500 to-orange-500 disabled:opacity-60 transition active:scale-95"
+                  className="flex items-center justify-center flex-1 gap-2 py-3 text-sm font-bold text-white transition rounded-2xl bg-linear-to-r from-amber-500 to-orange-500 disabled:opacity-60 active:scale-95"
                 >
                   {isUpdatingStatus ? (
                     <Loader className="w-4 h-4 animate-spin" />
@@ -625,7 +671,7 @@ export default function TrackingMap() {
                 <button
                   onClick={() => handleStatusChange("completed")}
                   disabled={isUpdatingStatus}
-                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm text-white bg-linear-to-r from-emerald-500 to-teal-500 disabled:opacity-60 transition active:scale-95"
+                  className="flex items-center justify-center flex-1 gap-2 py-3 text-sm font-bold text-white transition rounded-2xl bg-linear-to-r from-emerald-500 to-teal-500 disabled:opacity-60 active:scale-95"
                 >
                   {isUpdatingStatus ? (
                     <Loader className="w-4 h-4 animate-spin" />
@@ -640,7 +686,7 @@ export default function TrackingMap() {
 
           {/* Ride completed banner */}
           {rideStatus === "completed" && (
-            <div className="flex items-center justify-center gap-2 mt-3 py-3 rounded-2xl bg-linear-to-r from-emerald-50 to-teal-50 border border-emerald-200">
+            <div className="flex items-center justify-center gap-2 py-3 mt-3 border rounded-2xl bg-linear-to-r from-emerald-50 to-teal-50 border-emerald-200">
               <CheckCircle className="w-5 h-5 text-emerald-500" />
               <span className="text-sm font-bold text-emerald-700">Ride Completed!</span>
             </div>

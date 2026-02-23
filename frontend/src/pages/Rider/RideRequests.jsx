@@ -94,6 +94,17 @@ export default function RideRequests() {
     return req.status === activeTab;
   });
 
+  const geocodeAddress = async (address) => {
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+      const res = await fetch(`${API_BASE_URL}/geocoding/geocode?address=${encodeURIComponent(address)}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data.success && data.location) return { lat: data.location.lat, lng: data.location.lon };
+      return null;
+    } catch { return null; }
+  };
+
   const handleAcceptRide = async (rideId) => {
     try {
       console.log('Accepting ride:', rideId);
@@ -105,6 +116,12 @@ export default function RideRequests() {
         const rider = localStorage.getItem('rider');
         const riderData = rider ? JSON.parse(rider) : {};
 
+        // Geocode pickup and destination so the tracking map can show the road route
+        const [pickupCoords, destCoords] = await Promise.all([
+          geocodeAddress(acceptedReq.pickup || ''),
+          geocodeAddress(acceptedReq.dropoff || ''),
+        ]);
+
         // Navigate to live tracking map
         navigate('/tracking', {
           state: {
@@ -112,6 +129,8 @@ export default function RideRequests() {
             role: 'rider',
             pickup: acceptedReq.pickup || '',
             destination: acceptedReq.dropoff || '',
+            pickupCoords,
+            destCoords,
             riderName: `${riderData.firstName || ''} ${riderData.lastName || ''}`.trim(),
             riderPhone: riderData.phone || '',
             vehicleType: riderData.vehicle?.type || '',

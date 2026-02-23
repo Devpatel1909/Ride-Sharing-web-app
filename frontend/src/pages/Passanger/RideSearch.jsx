@@ -355,6 +355,7 @@ export default function RideSearch() {
   const [pickupCoords, setPickupCoords] = useState(null);
   const [destCoords, setDestCoords] = useState(null);
   const [booked, setBooked] = useState(null);
+  const [selectedRiderId, setSelectedRiderId] = useState(null);
 
   // ── Socket: listen for ride-accepted after booking ───────────────────────
   useEffect(() => {
@@ -697,13 +698,19 @@ export default function RideSearch() {
         rideType,
         vehicleType: selectedVehicle,
         pickupCoordinates: pickupCoords,
+        selectedRiderId: selectedRiderId || undefined,
       });
       if (result.success) {
+        const allRidersForVehicle = searchResults.vehicleAvailability?.[selectedVehicle]?.riders || [];
+        const chosenRider = selectedRiderId
+          ? allRidersForVehicle.find(r => r.id === selectedRiderId)
+          : null;
         setBooked({
           rideId: result.rideId,
           fare: selectedFare,
           vehicleName: selectedVehicleObj.name,
           nearbyRiders: result.nearbyRiders,
+          chosenRiderName: chosenRider?.name || null,
         });
         setStep(3);
       }
@@ -719,6 +726,7 @@ export default function RideSearch() {
     setPickup(""); setDestination("");
     setSearchResults(null); setSelectedVehicle(null);
     setPickupCoords(null); setDestCoords(null); setBooked(null);
+    setSelectedRiderId(null);
   };
 
   // Manual ride-status check (fallback for passenger)
@@ -774,7 +782,10 @@ export default function RideSearch() {
               <Detail label="Ride ID"        value={`#${booked.rideId}`} />
               <Detail label="Vehicle"         value={booked.vehicleName} />
               <Detail label="Fare"            value={`₹${booked.fare.toFixed(0)}`} highlight />
-              <Detail label="Riders notified" value={`${booked.nearbyRiders} rider(s)`} />
+              {booked.chosenRiderName
+                ? <Detail label="Requested Rider" value={booked.chosenRiderName} />
+                : <Detail label="Riders notified" value={`${booked.nearbyRiders} rider(s)`} />
+              }
 
               {/* Live waiting indicator – auto-navigates when rider accepts */}
               <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl p-4 mt-2">
@@ -1062,9 +1073,7 @@ export default function RideSearch() {
                 <div className="p-6 space-y-3">
                   {vehicleOptions.map((vehicle) => {
                     const vData = searchResults.vehicleAvailability?.[vehicle.id];
-                    // Use the backend's availableVehicles array as the source of truth
                     const isAvailable = searchResults.availableVehicles.includes(vehicle.id);
-                    // Always show rider count from vData (backend now returns all online riders)
                     const riderCount = vData != null ? vData.count : null;
                     const nearestRiders = vData?.riders || [];
                     const fare = vehicle.baseRate + vehicle.perKm * parseFloat(searchResults.distance);
@@ -1075,12 +1084,95 @@ export default function RideSearch() {
                         fare={fare}
                         isAvailable={isAvailable}
                         isSelected={selectedVehicle === vehicle.id}
-                        onSelect={() => isAvailable && setSelectedVehicle(vehicle.id)}
+                        onSelect={() => { if (isAvailable) { setSelectedVehicle(vehicle.id); setSelectedRiderId(null); } }}
                         riderCount={riderCount}
                         nearestRiders={nearestRiders}
                       />
                     );
                   })}
+
+                  {/* ── Rider selection panel ── */}
+                  {selectedVehicle && (() => {
+                    const riders = searchResults.vehicleAvailability?.[selectedVehicle]?.riders || [];
+                    if (riders.length === 0) return null;
+                    return (
+                      <div className="mt-2 rounded-2xl border-2 border-blue-200 bg-blue-50/60 overflow-hidden">
+                        <div className="px-5 py-3 bg-linear-to-r from-blue-600 to-purple-700 flex items-center gap-2">
+                          <Users className="w-4 h-4 text-white" />
+                          <span className="text-white font-bold text-sm">Select Your Rider</span>
+                          <span className="ml-auto text-white/70 text-xs">{riders.length} available</span>
+                        </div>
+                        <div className="p-3 space-y-2">
+                          {/* Any rider option */}
+                          <button
+                            onClick={() => setSelectedRiderId(null)}
+                            className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left ${
+                              selectedRiderId === null
+                                ? "border-blue-500 bg-blue-600 text-white shadow-lg"
+                                : "border-slate-200 bg-white hover:border-blue-300"
+                            }`}
+                          >
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg shrink-0 ${
+                              selectedRiderId === null ? "bg-white/20" : "bg-blue-100"
+                            }`}>🎲</div>
+                            <div className="flex-1">
+                              <p className={`font-bold text-sm ${selectedRiderId === null ? "text-white" : "text-slate-800"}`}>Any Available Rider</p>
+                              <p className={`text-xs ${selectedRiderId === null ? "text-white/70" : "text-slate-500"}`}>Nearest rider gets your request</p>
+                            </div>
+                            {selectedRiderId === null && <CheckCircle className="w-5 h-5 text-green-300 shrink-0" />}
+                          </button>
+
+                          {/* Individual riders */}
+                          {riders.map((rider) => (
+                            <button
+                              key={rider.id}
+                              onClick={() => setSelectedRiderId(rider.id)}
+                              className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left ${
+                                selectedRiderId === rider.id
+                                  ? "border-transparent bg-linear-to-br from-blue-600 via-purple-600 to-purple-700 text-white shadow-lg shadow-blue-500/30"
+                                  : "border-slate-200 bg-white hover:border-blue-300 hover:shadow-md"
+                              }`}
+                            >
+                              {/* Avatar */}
+                              {rider.profilePhoto ? (
+                                <img src={rider.profilePhoto} alt={rider.name} className="w-11 h-11 rounded-full object-cover ring-2 ring-white shrink-0" />
+                              ) : (
+                                <div className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm ring-2 ring-white shrink-0 ${
+                                  selectedRiderId === rider.id ? "bg-white/20 text-white" : "bg-linear-to-br from-blue-500 to-purple-600 text-white"
+                                }`}>
+                                  {rider.name ? rider.name.split(" ").map(n => n[0]).join("").slice(0,2).toUpperCase() : "?"}
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p className={`font-bold text-sm truncate ${selectedRiderId === rider.id ? "text-white" : "text-slate-800"}`}>
+                                  {rider.name || "Driver"}
+                                </p>
+                                <p className={`text-xs truncate ${selectedRiderId === rider.id ? "text-white/70" : "text-slate-500"}`}>
+                                  {[rider.vehicleModel, rider.vehicleColor].filter(Boolean).join(" · ") || "Car details pending"}
+                                </p>
+                              </div>
+                              <div className="flex flex-col items-end gap-1 shrink-0">
+                                <span className={`flex items-center gap-0.5 text-xs font-bold ${
+                                  selectedRiderId === rider.id ? "text-amber-200" : "text-amber-500"
+                                }`}>★ {(parseFloat(rider.rating) || 5.0).toFixed(1)}</span>
+                                {rider.distanceKm != null && (
+                                  <span className={`text-[11px] font-semibold ${selectedRiderId === rider.id ? "text-white/70" : "text-blue-600"}`}>
+                                    {rider.distanceKm} km
+                                  </span>
+                                )}
+                                {rider.vehiclePlate && (
+                                  <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                                    selectedRiderId === rider.id ? "bg-white/20 text-white" : "bg-slate-200 text-slate-600"
+                                  }`}>{rider.vehiclePlate}</span>
+                                )}
+                                {selectedRiderId === rider.id && <CheckCircle className="w-4 h-4 text-green-300" />}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                   {/* Warn when no riders are currently online */}
