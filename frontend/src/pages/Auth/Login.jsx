@@ -66,7 +66,7 @@ export default function Login() {
       <div className="flex items-center justify-center w-full p-8 lg:w-1/2">
         <div className="w-full max-w-md">
           {/* Logo */}
-          <Link to="/" className="flex items-center mb-8 space-x-3 group">
+          <Link to="/" className="flex items-center mb-8 space-x-3 group animate-fade-in-up">
             <div className="relative flex items-center justify-center w-12 h-12 text-xl font-bold text-white transition-all duration-300 ease-out shadow-2xl bg-gradient-to-br from-blue-600 via-purple-600 to-purple-700 rounded-xl shadow-blue-500/50 group-hover:shadow-blue-600/70 group-hover:scale-110 group-hover:rotate-3">
               <span className="relative z-10 font-display">R</span>
               <div className="absolute inset-0 transition-opacity duration-300 ease-out opacity-0 bg-gradient-to-br from-white/30 to-transparent rounded-xl group-hover:opacity-100"></div>
@@ -82,7 +82,7 @@ export default function Login() {
           </Link>
 
           {/* Header */}
-          <div className="mb-8">
+          <div className="mb-8 animate-fade-in-up delay-100">
             <h1 className="mb-2 text-4xl font-bold text-transparent bg-gradient-to-r from-blue-600 via-purple-600 to-purple-700 bg-clip-text font-display">
               Welcome back
             </h1>
@@ -94,13 +94,13 @@ export default function Login() {
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
-              <div className="p-4 text-red-700 border-2 border-red-200 bg-red-50 rounded-xl animate-in fade-in slide-in-from-top-2">
+              <div className="p-4 text-red-700 border-2 border-red-200 bg-red-50 rounded-xl animate-fade-in">
                 {error}
               </div>
             )}
 
             {/* Email Field */}
-            <div>
+            <div className="animate-fade-in-up delay-200">
               <label
                 htmlFor="email"
                 className="block mb-2 text-sm font-bold text-slate-700 font-display"
@@ -122,7 +122,7 @@ export default function Login() {
             </div>
 
             {/* Password Field */}
-            <div>
+            <div className="animate-fade-in-up delay-300">
               <label
                 htmlFor="password"
                 className="block mb-2 text-sm font-bold text-slate-700 font-display"
@@ -155,7 +155,7 @@ export default function Login() {
             </div>
 
             {/* Remember Me & Forgot Password */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between animate-fade-in-up delay-400">
               <div className="flex items-center">
                 <input
                   type="checkbox"
@@ -183,7 +183,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="relative flex items-center justify-center w-full py-4 space-x-2 overflow-hidden font-bold text-white transition-all duration-300 ease-out shadow-2xl bg-gradient-to-r from-blue-600 via-purple-600 to-purple-700 rounded-xl hover:from-blue-700 hover:via-purple-700 hover:to-purple-800 shadow-blue-500/50 hover:shadow-blue-600/70 hover:-translate-y-1 hover:scale-105 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:scale-100 font-display"
+              className="relative flex items-center justify-center w-full py-4 space-x-2 overflow-hidden font-bold text-white transition-all duration-300 ease-out shadow-2xl bg-gradient-to-r from-blue-600 via-purple-600 to-purple-700 rounded-xl hover:from-blue-700 hover:via-purple-700 hover:to-purple-800 shadow-blue-500/50 hover:shadow-blue-600/70 hover:-translate-y-1 hover:scale-105 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:scale-100 font-display animate-fade-in-up delay-500"
             >
               <div className="absolute inset-0 transition-opacity duration-300 ease-out opacity-0 bg-gradient-to-r from-purple-700 via-purple-600 to-blue-600 group-hover:opacity-100"></div>
               <span className="relative z-10">
@@ -196,7 +196,7 @@ export default function Login() {
           </form>
 
           {/* Divider */}
-          <div className="flex items-center my-8">
+          <div className="flex items-center my-8 animate-fade-in-up delay-600">
             <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-300 to-transparent"></div>
             <span className="px-4 text-sm font-medium text-slate-500">
               or continue with
@@ -209,7 +209,7 @@ export default function Login() {
             <button 
               onClick={() => window.location.href = 'http://localhost:3000/api/auth/google'}
               type="button"
-              className="flex items-center justify-center py-3 space-x-2 font-medium transition-all duration-300 ease-out bg-white border-2 border-slate-200 rounded-xl hover:border-blue-600 hover:bg-blue-50 hover:shadow-lg hover:-translate-y-1"
+              className="flex items-center justify-center py-3 space-x-2 font-medium transition-all duration-300 ease-out bg-white border-2 border-slate-200 rounded-xl hover:border-blue-600 hover:bg-blue-50 hover:shadow-lg hover:-translate-y-1 animate-fade-in-up delay-700"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path
@@ -232,7 +232,7 @@ export default function Login() {
               <span className="text-sm font-semibold">Google</span>
             </button>
 
-            <button className="flex items-center justify-center py-3 space-x-2 font-medium transition-all duration-300 ease-out bg-white border-2 border-slate-200 rounded-xl hover:border-purple-600 hover:bg-purple-50 hover:shadow-lg hover:-translate-y-1">
+            <button className="flex items-center justify-center py-3 space-x-2 font-medium transition-all duration-300 ease-out bg-white border-2 border-slate-200 rounded-xl hover:border-purple-600 hover:bg-purple-50 hover:shadow-lg hover:-translate-y-1 animate-fade-in-up delay-800">
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
               </svg>
@@ -241,7 +241,7 @@ export default function Login() {
           </div>
 
           {/* Sign Up Link */}
-          <p className="mt-8 font-medium text-center text-slate-600">
+          <p className="mt-8 font-medium text-center text-slate-600 animate-fade-in-up delay-900">
             Don't have an account?{" "}
             <Link
               to="/signup"
@@ -254,7 +254,7 @@ export default function Login() {
       </div>
 
       {/* Right Side - Image */}
-      <div className="relative hidden bg-gradient-to-br from-blue-600 via-purple-600 to-purple-700 lg:block lg:w-1/2">
+      <div className="relative hidden bg-gradient-to-br from-blue-600 via-purple-600 to-purple-700 lg:block lg:w-1/2 animate-fade-in-left">
         <img
           src="https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&w=1200&q=80"
           alt="People sharing rides"
@@ -264,20 +264,20 @@ export default function Login() {
 
         {/* Overlay Content */}
         <div className="absolute inset-0 flex flex-col justify-end p-12 text-white">
-          <h2 className="mb-4 text-5xl font-bold font-display">
+          <h2 className="mb-4 text-5xl font-bold font-display animate-fade-in-up delay-300">
             Go anywhere with anyone
           </h2>
-          <p className="mb-8 text-xl font-medium text-blue-100">
+          <p className="mb-8 text-xl font-medium text-blue-100 animate-fade-in-up delay-400">
             Join thousands of riders sharing rides and saving money every day.
           </p>
           <div className="flex items-center space-x-8">
-            <div className="relative p-6 overflow-hidden backdrop-blur-xl bg-white/10 rounded-2xl">
+            <div className="relative p-6 overflow-hidden backdrop-blur-xl bg-white/10 rounded-2xl animate-fade-in-up delay-500">
               <div className="text-4xl font-bold font-display">50K+</div>
               <div className="text-sm font-medium text-blue-100">
                 Active riders
               </div>
             </div>
-            <div className="relative p-6 overflow-hidden backdrop-blur-xl bg-white/10 rounded-2xl">
+            <div className="relative p-6 overflow-hidden backdrop-blur-xl bg-white/10 rounded-2xl animate-fade-in-up delay-600">
               <div className="text-4xl font-bold font-display">60%</div>
               <div className="text-sm font-medium text-blue-100">
                 Avg. savings

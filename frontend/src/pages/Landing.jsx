@@ -579,12 +579,12 @@ export default function Landing() {
         <div className="relative z-10 grid items-center gap-16 mx-auto max-w-7xl lg:grid-cols-2">
           {/* Left Content */}
           <div className="space-y-10">
-            <div className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 via-purple-600 to-purple-700 text-white rounded-full text-sm font-semibold shadow-2xl shadow-blue-500/50 hover:shadow-blue-600/70 transition-all hover:scale-105">
+            <div className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 via-purple-600 to-purple-700 text-white rounded-full text-sm font-semibold shadow-2xl shadow-blue-500/50 hover:shadow-blue-600/70 transition-all hover:scale-105 animate-fade-in-up">
               <Sparkles className="w-4 h-4 animate-pulse" />
               <span className="font-display">Share rides, Save money</span>
             </div>
 
-            <div className="space-y-6">
+            <div className="space-y-6 animate-fade-in-up delay-200">
               <h1 className="text-6xl font-bold leading-[1.1] tracking-tight text-slate-900 sm:text-7xl lg:text-8xl">
                 Go anywhere,
                 <span className="block mt-3 text-transparent bg-gradient-to-r from-blue-600 via-purple-600 to-purple-700 bg-clip-text animate-gradient">
@@ -595,7 +595,7 @@ export default function Landing() {
               <div className="h-1.5 w-32 bg-gradient-to-r from-blue-600 via-purple-600 to-purple-700 rounded-full"></div>
             </div>
 
-            <p className="max-w-xl text-xl font-medium leading-relaxed text-slate-600">
+            <p className="max-w-xl text-xl font-medium leading-relaxed text-slate-600 animate-fade-in-up delay-300">
               Join ongoing rides in your area and split the cost.{" "}
               <span className="font-bold text-transparent bg-gradient-to-r from-blue-600 to-purple-700 bg-clip-text">
                 Save up to 60%
@@ -604,7 +604,7 @@ export default function Landing() {
             </p>
 
             {/* Quick Booking Card */}
-            <div className="relative p-8 border shadow-2xl bg-white/80 backdrop-blur-xl border-white/60 shadow-slate-900/10 rounded-3xl">
+            <div className="relative p-8 border shadow-2xl bg-white/80 backdrop-blur-xl border-white/60 shadow-slate-900/10 rounded-3xl animate-fade-in-up delay-400">
               {/* Gradient Border Effect */}
               <div className="absolute inset-0 transition-opacity opacity-0 bg-gradient-to-r from-blue-600 via-purple-600 to-purple-700 rounded-3xl blur-xl group-hover:opacity-100 -z-10"></div>
               
@@ -618,7 +618,7 @@ export default function Landing() {
               <button
                 onClick={handleGetCurrentLocation}
                 disabled={locationLoading}
-                className="flex items-center justify-center w-full gap-3 px-5 py-4 mb-6 text-sm font-semibold transition-all border-2 text-slate-700 bg-gradient-to-r from-slate-50 to-slate-100 border-slate-200 rounded-2xl hover:from-white hover:to-slate-50 hover:border-slate-300 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed group"
+                className="flex items-center justify-center w-full gap-3 px-5 py-4 mb-6 text-sm font-semibold transition-all border-2 text-slate-700 bg-gradient-to-r from-slate-50 to-slate-100 border-slate-200 rounded-2xl hover:from-white hover:to-slate-50 hover:border-slate-300 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed group animate-fade-in-up delay-500"
               >
                 {locationLoading ? (
                   <Loader className="w-5 h-5 text-blue-600 animate-spin" />
@@ -630,21 +630,21 @@ export default function Landing() {
 
               {/* Location Error Message */}
               {locationError && (
-                <div className="p-4 mb-6 text-sm font-medium text-red-700 border-2 border-red-200 bg-gradient-to-r from-red-50 to-red-100 rounded-2xl">
+                <div className="p-4 mb-6 text-sm font-medium text-red-700 border-2 border-red-200 bg-gradient-to-r from-red-50 to-red-100 rounded-2xl animate-fade-in">
                   {locationError}
                 </div>
               )}
 
               {/* Auth Warning Message */}
               {authWarning && (
-                <div className="p-4 mb-6 text-sm font-medium border-2 text-amber-800 border-amber-200 bg-gradient-to-r from-amber-50 to-amber-100 rounded-2xl">
+                <div className="p-4 mb-6 text-sm font-medium border-2 text-amber-800 border-amber-200 bg-gradient-to-r from-amber-50 to-amber-100 rounded-2xl animate-fade-in">
                   {authWarning}
                 </div>
               )}
 
               <div className="space-y-5">
                 {/* Pickup Location */}
-                <div className="relative location-input-container">
+                <div className="relative location-input-container animate-fade-in-up delay-600">
                   <div className="absolute flex items-center justify-center w-10 h-10 shadow-lg left-4 top-5 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl">
                     <MapPin className="w-5 h-5 text-white" />
                   </div>
@@ -662,7 +662,7 @@ export default function Landing() {
 
                   {/* Pickup Suggestions Dropdown */}
                   {showPickupSuggestions && pickupSuggestions.length > 0 && (
-                    <div className="absolute left-0 right-0 z-50 mt-3 overflow-hidden transition-all duration-300 ease-out border shadow-2xl bg-white/98 backdrop-blur-2xl border-blue-200/50 rounded-3xl animate-in fade-in slide-in-from-top-2">
+                    <div className="absolute left-0 right-0 z-50 mt-3 overflow-hidden transition-all duration-300 ease-out border shadow-2xl bg-white/98 backdrop-blur-2xl border-blue-200/50 rounded-3xl animate-fade-in">
                       {/* Header */}
                       <div className="px-5 py-3 border-b bg-gradient-to-r from-blue-50/80 via-purple-50/80 to-purple-100/80 border-blue-100/50">
                         <p className="flex items-center gap-2 text-xs font-bold tracking-wide text-blue-700 uppercase font-display">
@@ -677,8 +677,8 @@ export default function Landing() {
                           <div
                             key={suggestion.id}
                             onClick={() => handlePickupSelect(suggestion)}
-                            className="relative flex items-start gap-4 px-5 py-4 transition-all duration-300 ease-out border-b cursor-pointer border-slate-100/50 hover:bg-gradient-to-r hover:from-blue-50 hover:via-purple-50 hover:to-purple-100 last:border-b-0 group"
-                            style={{ animationDelay: `${index * 30}ms` }}
+                            className="relative flex items-start gap-4 px-5 py-4 transition-all duration-300 ease-out border-b cursor-pointer border-slate-100/50 hover:bg-gradient-to-r hover:from-blue-50 hover:via-purple-50 hover:to-purple-100 last:border-b-0 group animate-fade-in-up"
+                            style={{ animationDelay: `${index * 50}ms` }}
                           >
                             {/* Icon and Badge */}
                             <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
@@ -721,7 +721,7 @@ export default function Landing() {
                 </div>
 
                 {/* Drop Location */}
-                <div className="relative location-input-container">
+                <div className="relative location-input-container animate-fade-in-up delay-700">
                   <div className="absolute flex items-center justify-center w-10 h-10 shadow-lg left-4 top-5 bg-gradient-to-br from-purple-600 to-purple-700 rounded-xl">
                     <MapPin className="w-5 h-5 text-white" />
                   </div>
@@ -745,7 +745,7 @@ export default function Landing() {
 
                   {/* Drop Suggestions Dropdown */}
                   {showDropSuggestions && dropSuggestions.length > 0 && (
-                    <div className="absolute left-0 right-0 z-50 mt-3 overflow-hidden transition-all duration-300 ease-out border shadow-2xl bg-white/98 backdrop-blur-2xl border-purple-200/50 rounded-3xl animate-in fade-in slide-in-from-top-2">
+                    <div className="absolute left-0 right-0 z-50 mt-3 overflow-hidden transition-all duration-300 ease-out border shadow-2xl bg-white/98 backdrop-blur-2xl border-purple-200/50 rounded-3xl animate-fade-in">
                       {/* Header */}
                       <div className="px-5 py-3 border-b bg-gradient-to-r from-purple-50/80 via-purple-100/80 to-purple-200/80 border-purple-100/50">
                         {dropSuggestions.some((s) => s.isNearby) ? (
@@ -772,8 +772,8 @@ export default function Landing() {
                           <div
                             key={suggestion.id}
                             onClick={() => handleDropSelect(suggestion)}
-                            className="relative flex items-start gap-4 px-5 py-4 transition-all duration-300 ease-out border-b cursor-pointer border-slate-100/50 hover:bg-gradient-to-r hover:from-purple-50 hover:via-purple-100 hover:to-purple-200 last:border-b-0 group hover:shadow-inner"
-                            style={{ animationDelay: `${index * 30}ms` }}
+                            className="relative flex items-start gap-4 px-5 py-4 transition-all duration-300 ease-out border-b cursor-pointer border-slate-100/50 hover:bg-gradient-to-r hover:from-purple-50 hover:via-purple-100 hover:to-purple-200 last:border-b-0 group hover:shadow-inner animate-fade-in-up"
+                            style={{ animationDelay: `${index * 50}ms` }}
                           >
                             {/* Icon and Badge */}
                             <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
@@ -835,7 +835,7 @@ export default function Landing() {
 
                 <button
                   onClick={handleSearchRide}
-                  className="flex items-center justify-center w-full gap-3 px-8 py-5 text-lg font-bold text-white transition-all bg-gradient-to-r from-blue-600 via-purple-600 to-purple-700 rounded-2xl hover:from-blue-700 hover:via-purple-700 hover:to-purple-800 shadow-2xl shadow-blue-500/50 hover:shadow-blue-600/70 hover:-translate-y-1 hover:scale-[1.02] group font-display"
+                  className="flex items-center justify-center w-full gap-3 px-8 py-5 text-lg font-bold text-white transition-all bg-gradient-to-r from-blue-600 via-purple-600 to-purple-700 rounded-2xl hover:from-blue-700 hover:via-purple-700 hover:to-purple-800 shadow-2xl shadow-blue-500/50 hover:shadow-blue-600/70 hover:-translate-y-1 hover:scale-[1.02] group font-display animate-fade-in-up delay-800"
                 >
                   <Search className="w-6 h-6" />
                   Search available rides
@@ -844,7 +844,7 @@ export default function Landing() {
               </div>
 
               {/* Stats */}
-              <div className="grid grid-cols-3 gap-6 pt-8 mt-8 border-t-2 border-slate-200">
+              <div className="grid grid-cols-3 gap-6 pt-8 mt-8 border-t-2 border-slate-200 animate-fade-in-up delay-900">
                 <div className="text-center">
                   <div className="text-3xl font-bold text-transparent bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text">50K+</div>
                   <div className="mt-1 text-xs font-semibold text-slate-600">Active riders</div>
@@ -862,7 +862,7 @@ export default function Landing() {
           </div>
 
           {/* Right Image Carousel */}
-          <div className="relative lg:h-[750px] h-96">
+          <div className="relative lg:h-[750px] h-96 animate-fade-in-right">
             {/* Image Carousel */}
             <div className="relative w-full h-full overflow-hidden shadow-2xl rounded-3xl ring-4 ring-white/50">
               {images.map((image, index) => (
@@ -897,7 +897,7 @@ export default function Landing() {
             </div>
 
             {/* Floating Card */}
-            <div className="absolute p-8 transition-transform border-2 border-white shadow-2xl bg-white/90 backdrop-blur-xl -bottom-8 -left-8 rounded-3xl ring-4 ring-white/20 hover:scale-105">
+            <div className="absolute p-8 transition-transform border-2 border-white shadow-2xl bg-white/90 backdrop-blur-xl -bottom-8 -left-8 rounded-3xl ring-4 ring-white/20 hover:scale-105 animate-fade-in-up delay-700">
               <div className="flex items-center gap-4 mb-4">
                 <div className="flex -space-x-3">
                   <div className="w-10 h-10 border-4 border-white rounded-full shadow-lg bg-gradient-to-br from-blue-500 to-blue-600"></div>
@@ -930,7 +930,7 @@ export default function Landing() {
       {/* How It Works Section */}
       <section className="relative px-4 py-32 sm:px-6 lg:px-8 bg-gradient-to-b from-white via-slate-50 to-white">
         <div className="mx-auto max-w-7xl">
-          <div className="mb-20 text-center">
+          <div className="mb-20 text-center animate-fade-in-up">
             <div className="inline-flex items-center gap-2 px-5 py-2 mb-6 text-sm font-bold text-blue-700 rounded-full bg-gradient-to-r from-blue-100 to-purple-100 font-display">
               <Zap className="w-4 h-4" />
               SIMPLE PROCESS
@@ -946,7 +946,7 @@ export default function Landing() {
 
           <div className="grid gap-10 md:grid-cols-3">
             {/* Step 1 */}
-            <div className="relative p-10 transition-all bg-white border-2 shadow-xl group border-slate-200 rounded-3xl hover:shadow-2xl hover:-translate-y-3 hover:border-blue-400">
+            <div className="relative p-10 transition-all bg-white border-2 shadow-xl group border-slate-200 rounded-3xl hover:shadow-2xl hover:-translate-y-3 hover:border-blue-400 animate-fade-in-up delay-100">
               <div className="absolute top-0 right-0 w-40 h-40 transition-opacity rounded-full opacity-0 bg-gradient-to-br from-blue-400 to-cyan-400 blur-3xl group-hover:opacity-40"></div>
               <div className="relative">
                 <div className="inline-flex items-center justify-center w-20 h-20 mb-8 transition-transform shadow-2xl bg-gradient-to-br from-blue-500 via-blue-600 to-cyan-600 rounded-2xl shadow-blue-500/40 group-hover:scale-110">
@@ -964,7 +964,7 @@ export default function Landing() {
             </div>
 
             {/* Step 2 */}
-            <div className="relative p-10 transition-all bg-white border-2 shadow-xl group border-slate-200 rounded-3xl hover:shadow-2xl hover:-translate-y-3 hover:border-purple-400">
+            <div className="relative p-10 transition-all bg-white border-2 shadow-xl group border-slate-200 rounded-3xl hover:shadow-2xl hover:-translate-y-3 hover:border-purple-400 animate-fade-in-up delay-200">
               <div className="absolute top-0 right-0 w-40 h-40 transition-opacity rounded-full opacity-0 bg-gradient-to-br from-purple-400 to-purple-600 blur-3xl group-hover:opacity-40"></div>
               <div className="relative">
                 <div className="inline-flex items-center justify-center w-20 h-20 mb-8 transition-transform shadow-2xl bg-gradient-to-br from-purple-500 via-purple-600 to-purple-700 rounded-2xl shadow-purple-500/40 group-hover:scale-110">
@@ -982,7 +982,7 @@ export default function Landing() {
             </div>
 
             {/* Step 3 */}
-            <div className="relative p-10 transition-all bg-white border-2 shadow-xl group border-slate-200 rounded-3xl hover:shadow-2xl hover:-translate-y-3 hover:border-green-300">
+            <div className="relative p-10 transition-all bg-white border-2 shadow-xl group border-slate-200 rounded-3xl hover:shadow-2xl hover:-translate-y-3 hover:border-green-300 animate-fade-in-up delay-300">
               <div className="absolute top-0 right-0 w-40 h-40 transition-opacity rounded-full opacity-0 bg-gradient-to-br from-green-400 to-emerald-400 blur-3xl group-hover:opacity-40"></div>
               <div className="relative">
                 <div className="inline-flex items-center justify-center w-20 h-20 mb-8 transition-transform shadow-2xl bg-gradient-to-br from-green-500 via-green-600 to-emerald-600 rounded-2xl shadow-green-500/40 group-hover:scale-110">
@@ -1009,7 +1009,7 @@ export default function Landing() {
         <div className="absolute bottom-0 left-0 bg-purple-500 rounded-full w-96 h-96 mix-blend-multiply filter blur-3xl opacity-20"></div>
         
         <div className="relative mx-auto max-w-7xl">
-          <div className="mb-20 text-center">
+          <div className="mb-20 text-center animate-fade-in-up">
             <div className="inline-flex items-center gap-2 px-5 py-2 mb-6 text-sm font-bold text-blue-300 rounded-full bg-white/10 backdrop-blur-sm font-display">
               <Heart className="w-4 h-4" />
               WHY CHOOSE US
@@ -1021,7 +1021,7 @@ export default function Landing() {
           </div>
 
           <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
-            <div className="relative p-8 transition-all border group bg-white/5 backdrop-blur-sm border-white/10 rounded-3xl hover:bg-white/10 hover:border-white/20 hover:-translate-y-2">
+            <div className="relative p-8 transition-all border group bg-white/5 backdrop-blur-sm border-white/10 rounded-3xl hover:bg-white/10 hover:border-white/20 hover:-translate-y-2 animate-fade-in-up delay-100">
               <div className="absolute inset-0 transition-opacity opacity-0 bg-gradient-to-br from-green-500/10 to-emerald-500/10 rounded-3xl group-hover:opacity-100"></div>
               <div className="relative">
                 <div className="inline-flex items-center justify-center w-16 h-16 mb-8 transition-transform shadow-2xl bg-gradient-to-br from-green-400 to-emerald-600 rounded-2xl shadow-green-500/40 group-hover:scale-110">
@@ -1035,7 +1035,7 @@ export default function Landing() {
               </div>
             </div>
 
-            <div className="relative p-8 transition-all border group bg-white/5 backdrop-blur-sm border-white/10 rounded-3xl hover:bg-white/10 hover:border-white/20 hover:-translate-y-2">
+            <div className="relative p-8 transition-all border group bg-white/5 backdrop-blur-sm border-white/10 rounded-3xl hover:bg-white/10 hover:border-white/20 hover:-translate-y-2 animate-fade-in-up delay-200">
               <div className="absolute inset-0 transition-opacity opacity-0 bg-gradient-to-br from-blue-500/10 to-cyan-500/10 rounded-3xl group-hover:opacity-100"></div>
               <div className="relative">
                 <div className="inline-flex items-center justify-center w-16 h-16 mb-8 transition-transform shadow-2xl bg-gradient-to-br from-blue-400 to-cyan-600 rounded-2xl shadow-blue-500/40 group-hover:scale-110">
@@ -1049,7 +1049,7 @@ export default function Landing() {
               </div>
             </div>
 
-            <div className="relative p-8 transition-all border group bg-white/5 backdrop-blur-sm border-white/10 rounded-3xl hover:bg-white/10 hover:border-white/20 hover:-translate-y-2">
+            <div className="relative p-8 transition-all border group bg-white/5 backdrop-blur-sm border-white/10 rounded-3xl hover:bg-white/10 hover:border-white/20 hover:-translate-y-2 animate-fade-in-up delay-300">
               <div className="absolute inset-0 transition-opacity opacity-0 bg-gradient-to-br from-purple-500/10 to-purple-700/10 rounded-3xl group-hover:opacity-100"></div>
               <div className="relative">
                 <div className="inline-flex items-center justify-center w-16 h-16 mb-8 transition-transform shadow-2xl bg-gradient-to-br from-purple-500 to-purple-700 rounded-2xl shadow-purple-500/40 group-hover:scale-110">
@@ -1063,7 +1063,7 @@ export default function Landing() {
               </div>
             </div>
 
-            <div className="relative p-8 transition-all border group bg-white/5 backdrop-blur-sm border-white/10 rounded-3xl hover:bg-white/10 hover:border-white/20 hover:-translate-y-2">
+            <div className="relative p-8 transition-all border group bg-white/5 backdrop-blur-sm border-white/10 rounded-3xl hover:bg-white/10 hover:border-white/20 hover:-translate-y-2 animate-fade-in-up delay-400">
               <div className="absolute inset-0 transition-opacity opacity-0 bg-gradient-to-br from-orange-500/10 to-red-500/10 rounded-3xl group-hover:opacity-100"></div>
               <div className="relative">
                 <div className="inline-flex items-center justify-center w-16 h-16 mb-8 transition-transform shadow-2xl bg-gradient-to-br from-orange-400 to-red-600 rounded-2xl shadow-orange-500/40 group-hover:scale-110">
@@ -1085,7 +1085,7 @@ export default function Landing() {
         <div className="absolute top-0 left-0 rounded-full bg-cyan-400 w-96 h-96 mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
         <div className="absolute bottom-0 right-0 bg-purple-400 rounded-full w-96 h-96 mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
         
-        <div className="relative max-w-5xl mx-auto text-center">
+        <div className="relative max-w-5xl mx-auto text-center animate-fade-in-up">
           <div className="inline-flex items-center gap-2 px-5 py-2 mb-8 text-sm font-bold text-white rounded-full bg-white/20 backdrop-blur-sm font-display">
             <Award className="w-4 h-4" />
             JOIN THE COMMUNITY
@@ -1099,7 +1099,7 @@ export default function Landing() {
             Join thousands of riders who are already sharing rides and cutting costs
           </p>
           
-          <div className="flex flex-wrap justify-center gap-6 mb-16">
+          <div className="flex flex-wrap justify-center gap-6 mb-16 animate-fade-in-up delay-100">
             <Link
               to="/ride-search"
               className="inline-flex items-center gap-3 px-10 py-5 text-xl font-bold text-blue-700 transition-all bg-white shadow-2xl rounded-2xl hover:bg-slate-50 shadow-white/30 hover:shadow-white/50 hover:-translate-y-2 hover:scale-105 group font-display"
@@ -1117,7 +1117,7 @@ export default function Landing() {
           </div>
 
           {/* Trust Indicators */}
-          <div className="flex flex-wrap justify-center gap-12">
+          <div className="flex flex-wrap justify-center gap-12 animate-fade-in-up delay-200">
             <div className="flex items-center gap-3 text-white">
               <div className="flex items-center justify-center w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl">
                 <Star className="w-6 h-6 text-yellow-300 fill-yellow-300" />
@@ -1141,10 +1141,10 @@ export default function Landing() {
       </section>
 
       {/* Footer */}
-      <footer className="px-4 py-20 bg-slate-950 sm:px-6 lg:px-8">
+      <footer className="px-4 py-20 bg-slate-950 sm:px-6 lg:px-8 animate-fade-in-up">
         <div className="mx-auto max-w-7xl">
           <div className="grid gap-12 mb-16 md:grid-cols-2 lg:grid-cols-4">
-            <div>
+            <div className="animate-fade-in-up delay-100">
               <h3 className="mb-6 text-sm font-bold tracking-wider uppercase text-slate-400 font-display">
                 Company
               </h3>
@@ -1167,7 +1167,7 @@ export default function Landing() {
               </ul>
             </div>
 
-            <div>
+            <div className="animate-fade-in-up delay-200">
               <h3 className="mb-6 text-sm font-bold tracking-wider uppercase text-slate-400 font-display">
                 Products
               </h3>
@@ -1190,7 +1190,7 @@ export default function Landing() {
               </ul>
             </div>
 
-            <div>
+            <div className="animate-fade-in-up delay-300">
               <h3 className="mb-6 text-sm font-bold tracking-wider uppercase text-slate-400 font-display">
                 Support
               </h3>
@@ -1213,7 +1213,7 @@ export default function Landing() {
               </ul>
             </div>
 
-            <div>
+            <div className="animate-fade-in-up delay-400">
               <h3 className="mb-6 text-sm font-bold tracking-wider uppercase text-slate-400 font-display">
                 Legal
               </h3>
@@ -1237,7 +1237,7 @@ export default function Landing() {
             </div>
           </div>
 
-          <div className="pt-8 border-t-2 border-slate-800">
+          <div className="pt-8 border-t-2 border-slate-800 animate-fade-in-up delay-500">
             <p className="text-base font-medium text-center text-slate-400">
               © 2024 RIDEX. All rights reserved. Go anywhere with anyone.
             </p>
