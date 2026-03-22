@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../../components/common/Header';
 import { 
@@ -24,7 +24,15 @@ export default function RiderDashboard() {
   const [socket, setSocket] = useState(null);
   const [newRequestNotification, setNewRequestNotification] = useState(null);
   const [currentLocation, setCurrentLocation] = useState(null);
+  const [currentCoords, setCurrentCoords] = useState(null);
   const [locationError, setLocationError] = useState(null);
+  const lastLocationSyncAtRef = useRef(0);
+  const LOCATION_SYNC_INTERVAL_MS = 15000;
+
+  const formatRupee = (value) => {
+    const normalized = String(value ?? '').replace(/₹/g, '').trim();
+    return `₹${normalized || '0'}`;
+  };
 
   // Socket.IO connection - separate from data fetching
   useEffect(() => {
@@ -72,8 +80,8 @@ export default function RiderDashboard() {
             rideData: rideData
           });
           
-          // Refresh pending requests
-          fetchPendingRequests();
+          // Refresh dashboard details without showing the full-page loader
+          fetchDashboardData();
           
           // Auto-hide notification after 10 seconds
           setTimeout(() => {
@@ -87,6 +95,11 @@ export default function RiderDashboard() {
 
         newSocket.on('connect_error', (error) => {
           console.error('Socket connection error:', error);
+        });
+
+        newSocket.on('ride-status-updated', () => {
+          // Keep stats/activity current when a ride status changes
+          fetchDashboardData();
         });
 
         setSocket(newSocket);
@@ -109,18 +122,8 @@ export default function RiderDashboard() {
   useEffect(() => {
     const riderToken = localStorage.getItem('riderToken');
     if (riderToken) {
-      fetchDashboardData();
+      fetchDashboardData({ showLoader: true });
     }
-  }, []); // Run once on mount
-
-  // Polling for dashboard updates - separate effect
-  useEffect(() => {
-    const interval = setInterval(() => {
-      fetchPendingRequests();
-      fetchDashboardData(); // Also refresh dashboard data
-    }, 10000); // Every 10 seconds
-
-    return () => clearInterval(interval);
   }, []); // Run once on mount
 
   // Geolocation tracking - separate effect
@@ -134,6 +137,10 @@ export default function RiderDashboard() {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const location = `Location (${position.coords.latitude.toFixed(6)}, ${position.coords.longitude.toFixed(6)})`;
+        setCurrentCoords({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
         setCurrentLocation(location);
         console.log('📍 Initial location:', location);
       },
@@ -152,6 +159,10 @@ export default function RiderDashboard() {
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
         const location = `Location (${position.coords.latitude.toFixed(6)}, ${position.coords.longitude.toFixed(6)})`;
+        setCurrentCoords({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
         setCurrentLocation(location);
         console.log('📍 Location updated:', location);
       },
@@ -173,25 +184,31 @@ export default function RiderDashboard() {
     };
   }, []);
 
-  // Auto-update location to server every 2 seconds
+  // Update location when it changes (throttled) instead of fixed interval polling
   useEffect(() => {
-    if (!currentLocation || !isOnline) return;
+    if (!currentLocation || !currentCoords || !isOnline) return;
 
-    const locationInterval = setInterval(async () => {
+    const now = Date.now();
+    if (now - lastLocationSyncAtRef.current < LOCATION_SYNC_INTERVAL_MS) return;
+
+    const syncLocation = async () => {
       try {
-        await riderAPI.updateAvailability(isOnline, currentLocation);
-        console.log('📡 Location sent to server:', currentLocation);
+        await riderAPI.updateAvailability(true, currentLocation);
+        lastLocationSyncAtRef.current = now;
+        console.log('📡 Location synced to server:', currentLocation);
       } catch (error) {
         console.error('Failed to update location:', error);
       }
-    }, 2000); // Every 2 seconds
+    };
 
-    return () => clearInterval(locationInterval);
-  }, [currentLocation, isOnline]);
+    syncLocation();
+  }, [currentLocation, currentCoords, isOnline]);
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = async ({ showLoader = false } = {}) => {
     try {
-      setLoading(true);
+      if (showLoader) {
+        setLoading(true);
+      }
       const [
         statsData,
         requestsData,
@@ -226,7 +243,9 @@ export default function RiderDashboard() {
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
     } finally {
-      setLoading(false);
+      if (showLoader) {
+        setLoading(false);
+      }
     }
   };
 
@@ -250,6 +269,9 @@ export default function RiderDashboard() {
       
       await riderAPI.updateAvailability(newStatus, currentLocation);
       setIsOnline(newStatus);
+      if (newStatus) {
+        lastLocationSyncAtRef.current = Date.now();
+      }
       // Persist to localStorage
       localStorage.setItem('riderIsOnline', newStatus.toString());
       
@@ -265,6 +287,26 @@ export default function RiderDashboard() {
     } catch (error) {
       console.error('❌ Failed to update availability:', error);
       alert('Failed to update availability status');
+    }
+  };
+
+  const handleManualRefresh = async () => {
+    await fetchDashboardData();
+  };
+
+  const handleManualLocationUpdate = async () => {
+    if (!currentLocation) {
+      alert('Location not available yet. Please allow GPS and try again.');
+      return;
+    }
+
+    try {
+      await riderAPI.updateAvailability(isOnline, currentLocation);
+      lastLocationSyncAtRef.current = Date.now();
+      alert('📍 Location updated successfully');
+    } catch (error) {
+      console.error('Manual location update failed:', error);
+      alert('Failed to update location');
     }
   };
 
@@ -458,7 +500,7 @@ export default function RiderDashboard() {
               <div className="bg-white/20 rounded-lg p-3 space-y-1">
                 <p className="text-sm"><strong>From:</strong> {newRequestNotification.rideData.pickup}</p>
                 <p className="text-sm"><strong>To:</strong> {newRequestNotification.rideData.destination}</p>
-                <p className="text-sm"><strong>Fare:</strong> ₹{newRequestNotification.rideData.fare}</p>
+                <p className="text-sm"><strong>Fare:</strong> {formatRupee(newRequestNotification.rideData.fare)}</p>
                 <p className="text-sm"><strong>Distance:</strong> {newRequestNotification.rideData.distance} km</p>
               </div>
             </div>
@@ -485,6 +527,12 @@ export default function RiderDashboard() {
           <p className="text-lg font-medium text-slate-600">
             🎯 Ready to accept new ride requests and earn money today 💵
           </p>
+          <button
+            onClick={handleManualRefresh}
+            className="px-4 py-2 mt-4 text-sm font-bold text-purple-700 transition-colors border border-purple-200 rounded-lg bg-white/80 hover:bg-purple-50"
+          >
+            Refresh Details
+          </button>
         </div>
 
         {/* Stats Grid */}
@@ -610,7 +658,7 @@ export default function RiderDashboard() {
                         </div>
                         <div className="text-right">
                           <div className="px-4 py-2 mb-1 text-lg font-bold text-green-700 bg-green-100 rounded-full font-display">
-                            💵 ₹{request.fare || 0}
+                            {formatRupee(request.fare)}
                           </div>
                           <div className="text-xs text-slate-500">{request.distance || 0}km</div>
                         </div>
@@ -724,7 +772,7 @@ export default function RiderDashboard() {
                     </div>
                     <div className="flex items-center justify-center gap-2 text-xs text-green-600">
                       <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                      <span>Auto-updating every 2 seconds</span>
+                      <span>Updates on movement with periodic sync</span>
                     </div>
                   </div>
                 ) : (
@@ -798,7 +846,10 @@ export default function RiderDashboard() {
                     </p>
                   </div>
                 </div>
-                <button className="w-full px-4 py-2 mt-3 text-sm font-medium text-blue-600 transition-colors bg-blue-50 rounded-lg hover:bg-blue-100">
+                <button
+                  onClick={handleManualLocationUpdate}
+                  className="w-full px-4 py-2 mt-3 text-sm font-medium text-blue-600 transition-colors bg-blue-50 rounded-lg hover:bg-blue-100"
+                >
                   📍 Update Location
                 </button>
               </div>
@@ -915,7 +966,7 @@ export default function RiderDashboard() {
                         </div>
                         <div className="text-right">
                           <div className="px-4 py-2 text-lg font-bold text-green-700 bg-green-100 rounded-full font-display">
-                            💵 ₹{activity.fare || 0}
+                            {formatRupee(activity.fare)}
                           </div>
                         </div>
                       </div>

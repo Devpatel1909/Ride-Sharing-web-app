@@ -351,11 +351,14 @@ export default function RideSearch() {
   const [locationError, setLocationError] = useState(null);
   const [mapCenter, setMapCenter] = useState([20.5937, 78.9629]); // India default
   const [searchResults, setSearchResults] = useState(null);
+  const [searchSnapshot, setSearchSnapshot] = useState(null);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [pickupCoords, setPickupCoords] = useState(null);
   const [destCoords, setDestCoords] = useState(null);
   const [booked, setBooked] = useState(null);
   const [selectedRiderId, setSelectedRiderId] = useState(null);
+
+  const searchedDistance = parseFloat(searchSnapshot?.distance || searchResults?.distance || 0);
 
   // ── Socket: listen for ride-accepted after booking ───────────────────────
   useEffect(() => {
@@ -381,10 +384,10 @@ export default function RideSearch() {
           riderPhone:   riderPhone   || "",
           vehicleType:  vehicleType  || "",
           vehiclePlate: vehiclePlate || "",
-          pickup,
-          destination,
-          pickupCoords,
-          destCoords,
+          pickup: booked?.pickup || pickup,
+          destination: booked?.destination || destination,
+          pickupCoords: booked?.pickupCoords || pickupCoords,
+          destCoords: booked?.destCoords || destCoords,
         },
       });
     };
@@ -537,6 +540,8 @@ export default function RideSearch() {
   const [destSearching, setDestSearching] = useState(false);
   const pickupRef = useRef(null);
   const destRef = useRef(null);
+  const suppressNextPickupSuggestRef = useRef(false);
+  const suppressNextDestSuggestRef = useRef(false);
 
   // ── Suggestion search via backend geocoding API ──────────────────────
   const fetchSuggestions = useCallback(async (query) => {
@@ -556,6 +561,13 @@ export default function RideSearch() {
 
   // Debounced pickup suggestions
   useEffect(() => {
+    if (suppressNextPickupSuggestRef.current) {
+      suppressNextPickupSuggestRef.current = false;
+      setPickupSearching(false);
+      setShowPickupSugg(false);
+      return;
+    }
+
     if (!pickup || pickup.trim().length < 2) { setPickupSuggestions([]); setShowPickupSugg(false); return; }
     setPickupSearching(true);
     const timer = setTimeout(async () => {
@@ -569,6 +581,13 @@ export default function RideSearch() {
 
   // Debounced destination suggestions
   useEffect(() => {
+    if (suppressNextDestSuggestRef.current) {
+      suppressNextDestSuggestRef.current = false;
+      setDestSearching(false);
+      setShowDestSugg(false);
+      return;
+    }
+
     if (!destination || destination.trim().length < 2) { setDestSuggestions([]); setShowDestSugg(false); return; }
     setDestSearching(true);
     const timer = setTimeout(async () => {
@@ -601,11 +620,16 @@ export default function RideSearch() {
   const selectedFare =
     selectedVehicleObj && searchResults
       ? selectedVehicleObj.baseRate +
-        selectedVehicleObj.perKm * parseFloat(searchResults.distance)
+        selectedVehicleObj.perKm * searchedDistance
       : null;
 
   const handleSearch = async (e) => {
     e.preventDefault();
+    const searchPickup = pickup.trim();
+    const searchDestination = destination.trim();
+    const searchRideType = rideType;
+    const searchPassengers = passengers;
+
     const token = localStorage.getItem("token");
     if (!token) {
       alert("Please login as a passenger first");
@@ -619,8 +643,8 @@ export default function RideSearch() {
       const API_BASE_URL =
         import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
       const [pickupRes, destRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/geocoding/geocode?address=${encodeURIComponent(pickup)}`),
-        fetch(`${API_BASE_URL}/geocoding/geocode?address=${encodeURIComponent(destination)}`),
+        fetch(`${API_BASE_URL}/geocoding/geocode?address=${encodeURIComponent(searchPickup)}`),
+        fetch(`${API_BASE_URL}/geocoding/geocode?address=${encodeURIComponent(searchDestination)}`),
       ]);
       if (!pickupRes.ok || !destRes.ok) throw new Error("Geocoding request failed");
       const [pickupResult, destResult] = await Promise.all([
@@ -643,7 +667,7 @@ export default function RideSearch() {
           Math.sin(dLon / 2) ** 2;
       const distance = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       // Pass geocoded pickup coords so backend can filter riders within 2 km
-      const availability = await ridesAPI.checkAvailability(pickup, destination, distance.toFixed(2), pLat, pLon);
+      const availability = await ridesAPI.checkAvailability(searchPickup, searchDestination, distance.toFixed(2), pLat, pLon);
       
       // 🚀 Console: Log rider availability information
       console.group('🚗 Rider Availability Check');
@@ -678,6 +702,16 @@ export default function RideSearch() {
         radiusKm: availability.radiusKm || 2,
         hasPickupCoords: availability.hasPickupCoords || false,
       });
+      setSearchSnapshot({
+        pickup: searchPickup,
+        destination: searchDestination,
+        rideType: searchRideType,
+        passengers: searchPassengers,
+        distance: distance.toFixed(2),
+        pickupCoords: { lat: pickupResult.location.lat, lng: pickupResult.location.lon },
+        destCoords: { lat: destResult.location.lat, lng: destResult.location.lon },
+      });
+      setSelectedRiderId(null);
       setStep(2);
     } catch (error) {
       alert("Search error: " + error.message);
@@ -687,17 +721,17 @@ export default function RideSearch() {
   };
 
   const handleBookRide = async () => {
-    if (!selectedVehicle) return;
+    if (!selectedVehicle || !searchSnapshot) return;
     try {
       setIsLoading(true);
       const result = await ridesAPI.bookRide({
-        pickup,
-        destination,
-        distance: parseFloat(searchResults.distance),
+        pickup: searchSnapshot.pickup,
+        destination: searchSnapshot.destination,
+        distance: parseFloat(searchSnapshot.distance),
         fare: selectedFare.toFixed(2),
-        rideType,
+        rideType: searchSnapshot.rideType,
         vehicleType: selectedVehicle,
-        pickupCoordinates: pickupCoords,
+        pickupCoordinates: searchSnapshot.pickupCoords,
         selectedRiderId: selectedRiderId || undefined,
       });
       if (result.success) {
@@ -711,6 +745,10 @@ export default function RideSearch() {
           vehicleName: selectedVehicleObj.name,
           nearbyRiders: result.nearbyRiders,
           chosenRiderName: chosenRider?.name || null,
+          pickup: searchSnapshot.pickup,
+          destination: searchSnapshot.destination,
+          pickupCoords: searchSnapshot.pickupCoords,
+          destCoords: searchSnapshot.destCoords,
         });
         setStep(3);
       }
@@ -725,6 +763,7 @@ export default function RideSearch() {
     setStep(1);
     setPickup(""); setDestination("");
     setSearchResults(null); setSelectedVehicle(null);
+    setSearchSnapshot(null);
     setPickupCoords(null); setDestCoords(null); setBooked(null);
     setSelectedRiderId(null);
   };
@@ -745,10 +784,10 @@ export default function RideSearch() {
             riderPhone:   ride.rider_phone   || "",
             vehicleType:  ride.vehicle_type  || "",
             vehiclePlate: ride.vehicle_number || "",
-            pickup,
-            destination,
-            pickupCoords,
-            destCoords,
+            pickup: booked?.pickup || pickup,
+            destination: booked?.destination || destination,
+            pickupCoords: booked?.pickupCoords || pickupCoords,
+            destCoords: booked?.destCoords || destCoords,
           },
         });
       } else {
@@ -906,7 +945,11 @@ export default function RideSearch() {
                       <input
                         type="text"
                         value={pickup}
-                        onChange={(e) => { setPickup(e.target.value); setLocationError(null); }}
+                        onChange={(e) => {
+                          suppressNextPickupSuggestRef.current = false;
+                          setPickup(e.target.value);
+                          setLocationError(null);
+                        }}
                         onFocus={() => pickupSuggestions.length > 0 && setShowPickupSugg(true)}
                         placeholder={locationLoading ? "📍 Detecting your location..." : "Pickup location"}
                         required
@@ -937,6 +980,7 @@ export default function RideSearch() {
                               type="button"
                               onMouseDown={(e) => e.preventDefault()}
                               onClick={() => {
+                                suppressNextPickupSuggestRef.current = true;
                                 setPickup(s.shortName || s.name);
                                 setShowPickupSugg(false);
                                 if (s.lat && s.lon) setPickupCoords({ lat: s.lat, lng: s.lon });
@@ -978,7 +1022,10 @@ export default function RideSearch() {
                     <input
                       type="text"
                       value={destination}
-                      onChange={(e) => setDestination(e.target.value)}
+                      onChange={(e) => {
+                        suppressNextDestSuggestRef.current = false;
+                        setDestination(e.target.value);
+                      }}
                       onFocus={() => destSuggestions.length > 0 && setShowDestSugg(true)}
                       placeholder="Destination"
                       required
@@ -996,6 +1043,7 @@ export default function RideSearch() {
                               type="button"
                               onMouseDown={(e) => e.preventDefault()}
                               onClick={() => {
+                                suppressNextDestSuggestRef.current = true;
                                 setDestination(s.shortName || s.name);
                                 setShowDestSugg(false);
                                 if (s.lat && s.lon) setDestCoords({ lat: s.lat, lng: s.lon });
@@ -1060,7 +1108,7 @@ export default function RideSearch() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">
-                      {searchResults.distance} km
+                      {searchSnapshot?.distance || searchResults.distance} km
                     </span>
                     <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${searchResults.personalAvailable ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
                       {searchResults.personalAvailable
@@ -1076,7 +1124,7 @@ export default function RideSearch() {
                     const isAvailable = searchResults.availableVehicles.includes(vehicle.id);
                     const riderCount = vData != null ? vData.count : null;
                     const nearestRiders = vData?.riders || [];
-                    const fare = vehicle.baseRate + vehicle.perKm * parseFloat(searchResults.distance);
+                    const fare = vehicle.baseRate + vehicle.perKm * searchedDistance;
                     return (
                       <VehicleCard
                         key={vehicle.id}
@@ -1208,9 +1256,9 @@ export default function RideSearch() {
           {/* ── Right sidebar (desktop) ── */}
           <div className="w-72 shrink-0 hidden lg:block space-y-5">
             <TripSummary
-              pickup={pickup}
-              destination={destination}
-              distance={searchResults?.distance}
+              pickup={searchSnapshot?.pickup || pickup}
+              destination={searchSnapshot?.destination || destination}
+              distance={searchSnapshot?.distance || searchResults?.distance}
               vehicle={selectedVehicleObj}
               fare={selectedFare}
             />

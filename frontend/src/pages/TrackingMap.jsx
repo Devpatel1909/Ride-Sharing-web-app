@@ -365,7 +365,7 @@ export default function TrackingMap() {
       <Header />
 
       {/* ── Info bar ──────────────────────────────────────────────────────── */}
-      <div className="fixed left-0 right-0 z-40 px-4 py-3 border-b shadow-md top-16 bg-white/95 backdrop-blur-sm border-slate-200">
+      <div className="fixed left-0 right-0 z-40 px-4 py-3 border-b shadow-md top-24 bg-white/95 backdrop-blur-sm border-slate-200">
         <div className="flex flex-wrap items-center justify-between max-w-5xl gap-3 mx-auto">
           {/* Left: ride status */}
           <div className="flex items-center gap-3">
@@ -408,11 +408,11 @@ export default function TrackingMap() {
       </div>
 
       {/* ── Map ──────────────────────────────────────────────────────────── */}
-      <div className="flex-1 mt-28">
+      <div className="flex-1 mt-40">
         <MapContainer
           center={mapCenter}
           zoom={14}
-          style={{ height: "calc(100vh - 7rem)", width: "100%" }}
+          style={{ height: "calc(100vh - 10rem)", width: "100%" }}
           className="z-0"
         >
           <TileLayer
@@ -531,8 +531,8 @@ export default function TrackingMap() {
       </div>
 
       {/* ── Bottom info card ─────────────────────────────────────────────── */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 px-4 pt-3 pb-4 border-t shadow-2xl bg-white/95 backdrop-blur-sm border-slate-200">
-        <div className="max-w-5xl mx-auto">
+      <div className="fixed bottom-0 left-0 right-0 z-40 px-4 pt-3 pb-4 border-t shadow-2xl bg-white/95 backdrop-blur-sm border-slate-200 max-h-[50vh] overflow-y-auto">
+        <div className="max-w-5xl mx-auto pb-1">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {/* My location status */}
             <div className="flex items-center gap-3 p-3 border border-blue-100 rounded-2xl bg-linear-to-r from-blue-50 to-purple-50">
