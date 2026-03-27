@@ -12,3 +12,14 @@ body {
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
 }
+
+/* Suppress Google Maps auth/billing popup UI across all embedded maps. */
+.gm-style .gm-err-container,
+.gm-style .gm-err-content,
+.gm-style .gm-err-title,
+.gm-style .gm-err-message {
+	display: none !important;
+	visibility: hidden !important;
+	opacity: 0 !important;
+	pointer-events: none !important;
+}

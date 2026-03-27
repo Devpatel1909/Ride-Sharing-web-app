@@ -286,7 +286,17 @@ export default function RiderDashboard() {
       }
     } catch (error) {
       console.error('❌ Failed to update availability:', error);
-      alert('Failed to update availability status');
+
+      if (error?.status === 401 || error?.status === 403) {
+        localStorage.removeItem('riderToken');
+        localStorage.removeItem('rider');
+        localStorage.removeItem('riderIsOnline');
+        alert('Your rider session expired. Please login again.');
+        navigate('/rider-login', { replace: true });
+        return;
+      }
+
+      alert(error?.message || 'Failed to update availability status');
     }
   };
 

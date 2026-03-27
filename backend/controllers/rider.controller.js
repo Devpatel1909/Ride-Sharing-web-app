@@ -46,7 +46,7 @@ exports.signup = async (req, res) => {
     const token = jwt.sign(
       { riderId: newRider.id, email: newRider.email },
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '1h' }
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
 
     res.status(201).json({
@@ -91,7 +91,7 @@ exports.login = async (req, res) => {
     const token = jwt.sign(
       { riderId: rider.id, email: rider.email },
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '1h' }
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
 
     res.json({

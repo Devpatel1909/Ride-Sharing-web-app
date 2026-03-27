@@ -15,8 +15,14 @@ const getAuthHeaders = (isRider = false) => {
 // Handle API responses
 const handleResponse = async (response) => {
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Network error' }));
-    throw new Error(error.error || 'Something went wrong');
+    const error = await response
+      .json()
+      .catch(() => ({ error: 'Network error' }));
+
+    const message = error.error || error.message || 'Something went wrong';
+    const apiError = new Error(message);
+    apiError.status = response.status;
+    throw apiError;
   }
   return response.json();
 };

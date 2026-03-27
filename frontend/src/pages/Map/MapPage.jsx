@@ -1,104 +1,34 @@
-import React, { useState, useEffect } from "react";
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet";
+import React, { useState, useEffect, useRef, useMemo } from "react";
+import { GoogleMap, Marker, Polyline, useJsApiLoader } from "@react-google-maps/api";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Navigation, MapPin, Locate, ZoomIn, ZoomOut, Car, ArrowLeft, CheckCircle } from "lucide-react";
-import "leaflet/dist/leaflet.css";
-import L from "leaflet";
 
-// Fix for default marker icons in React-Leaflet
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
-  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-});
-
-// Blue marker — user location
-const userLocationIcon = new L.Icon({
-  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png",
-  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-  iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41],
-});
-
-// Green marker — pickup
-const pickupMarkerIcon = new L.Icon({
-  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png",
-  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-  iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41],
-});
-
-// Red marker — destination
-const destMarkerIcon = new L.Icon({
-  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png",
-  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-  iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41],
-});
-
-// Auto-fit map to show both markers
-function FitBounds({ bounds }) {
-  const map = useMap();
-  useEffect(() => {
-    if (bounds && bounds.length === 2) map.fitBounds(bounds, { padding: [80, 80] });
-  }, [bounds, map]);
-  return null;
-}
-
-// Location marker for browser mode
-function LocationMarker({ position, setPosition }) {
-  const map = useMap();
-  useEffect(() => {
-    map.on("locationfound", (e) => { setPosition(e.latlng); map.flyTo(e.latlng, 15); });
-    map.on("locationerror", (e) => console.error("Location error:", e.message));
-  }, [map, setPosition]);
-  return position ? (
-    <Marker position={position} icon={userLocationIcon}>
-      <Popup><strong>Your Location</strong></Popup>
-    </Marker>
-  ) : null;
-}
-
-// Map zoom + locate controls
-function MapControls({ onLocate }) {
-  const map = useMap();
-  return (
-    <div className="absolute right-4 top-4 z-1000 flex flex-col gap-2">
-      <button onClick={() => map.zoomIn()} className="p-2 bg-white rounded-lg shadow-lg hover:bg-gray-100" title="Zoom In">
-        <ZoomIn size={20} className="text-gray-700" />
-      </button>
-      <button onClick={() => map.zoomOut()} className="p-2 bg-white rounded-lg shadow-lg hover:bg-gray-100" title="Zoom Out">
-        <ZoomOut size={20} className="text-gray-700" />
-      </button>
-      {onLocate && (
-        <button onClick={onLocate} className="p-2 bg-white rounded-lg shadow-lg hover:bg-gray-100" title="Find My Location">
-          <Locate size={20} className="text-gray-700" />
-        </button>
-      )}
-    </div>
-  );
-}
-
-// Fly to position
-function FlyToLocation({ position }) {
-  const map = useMap();
-  useEffect(() => {
-    if (position) map.flyTo([position.lat, position.lng], 15);
-  }, [position, map]);
-  return null;
-}
+const mapContainerStyle = {
+  height: "100%",
+  width: "100%",
+  minHeight: "calc(100vh - 72px)",
+};
 
 export default function MapPage() {
   const navigate = useNavigate();
   const { state } = useLocation();
   const booking = state?.booking || null;
 
-  // Booking-mode
   const [confirmed, setConfirmed] = useState(false);
-
-  // Browser-mode
   const [userPosition, setUserPosition] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [browseDestination, setBrowseDestination] = useState(null);
-  const defaultCenter = [28.6139, 77.209];
+
+  const mapRef = useRef(null);
+  const hasFittedMapRef = useRef(false);
+
+  const defaultCenter = { lat: 28.6139, lng: 77.209 };
+
+  const mapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
+  const { isLoaded, loadError } = useJsApiLoader({
+    id: "map-page-google-map",
+    googleMapsApiKey: mapsApiKey,
+  });
 
   useEffect(() => {
     if (!booking && navigator.geolocation) {
@@ -109,10 +39,33 @@ export default function MapPage() {
     }
   }, [booking]);
 
+  useEffect(() => {
+    if (!isLoaded || !mapRef.current || booking || !userPosition) return;
+    mapRef.current.panTo(userPosition);
+    mapRef.current.setZoom(15);
+  }, [isLoaded, booking, userPosition]);
+
+  useEffect(() => {
+    if (!isLoaded || !mapRef.current || !booking?.pickupCoords || typeof window === "undefined" || !window.google) return;
+
+    const bounds = new window.google.maps.LatLngBounds();
+    bounds.extend(booking.pickupCoords);
+    bounds.extend(booking.destCoords);
+    mapRef.current.fitBounds(bounds, 80);
+    hasFittedMapRef.current = true;
+  }, [isLoaded, booking?.pickupCoords, booking?.destCoords]);
+
   const handleLocateMe = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => setUserPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        (pos) => {
+          const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          setUserPosition(loc);
+          if (mapRef.current) {
+            mapRef.current.panTo(loc);
+            mapRef.current.setZoom(15);
+          }
+        },
         () => alert("Unable to get your location. Please enable location services.")
       );
     }
@@ -122,8 +75,12 @@ export default function MapPage() {
     e.preventDefault();
     if (searchQuery.trim()) {
       const randomOffset = () => (Math.random() - 0.5) * 0.05;
-      const center = userPosition || { lat: defaultCenter[0], lng: defaultCenter[1] };
-      setBrowseDestination({ lat: center.lat + randomOffset(), lng: center.lng + randomOffset(), name: searchQuery });
+      const center = userPosition || defaultCenter;
+      const target = { lat: center.lat + randomOffset(), lng: center.lng + randomOffset(), name: searchQuery };
+      setBrowseDestination(target);
+      if (mapRef.current) {
+        mapRef.current.panTo({ lat: target.lat, lng: target.lng });
+      }
     }
   };
 
@@ -137,18 +94,38 @@ export default function MapPage() {
 
   const handleConfirmBooking = () => setConfirmed(true);
 
-  // Map center & bounds
   const mapCenter = booking?.pickupCoords
-    ? [(booking.pickupCoords.lat + booking.destCoords.lat) / 2, (booking.pickupCoords.lng + booking.destCoords.lng) / 2]
-    : userPosition ? [userPosition.lat, userPosition.lng] : defaultCenter;
+    ? {
+        lat: (booking.pickupCoords.lat + booking.destCoords.lat) / 2,
+        lng: (booking.pickupCoords.lng + booking.destCoords.lng) / 2,
+      }
+    : userPosition || defaultCenter;
 
-  const mapBounds = booking?.pickupCoords
-    ? [[booking.pickupCoords.lat, booking.pickupCoords.lng], [booking.destCoords.lat, booking.destCoords.lng]]
-    : null;
+  const bookingRoutePath = useMemo(() => {
+    if (!booking?.routeCoordinates?.length) return [];
+    return booking.routeCoordinates
+      .map((p) => {
+        if (Array.isArray(p) && p.length >= 2) return { lat: p[0], lng: p[1] };
+        if (p && typeof p === "object" && typeof p.lat === "number" && typeof p.lng === "number") return p;
+        return null;
+      })
+      .filter(Boolean);
+  }, [booking?.routeCoordinates]);
+
+  const markerDot = (fillColor, scale = 7) => {
+    if (!isLoaded || typeof window === "undefined" || !window.google) return undefined;
+    return {
+      path: window.google.maps.SymbolPath.CIRCLE,
+      fillColor,
+      fillOpacity: 1,
+      strokeColor: "#ffffff",
+      strokeWeight: 2,
+      scale,
+    };
+  };
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
-      {/* Header */}
       <header className="bg-black text-white z-1001">
         <div className="flex items-center justify-between px-4 py-4 mx-auto max-w-7xl">
           <Link to="/" className="flex items-center space-x-2">
@@ -175,52 +152,113 @@ export default function MapPage() {
       </header>
 
       <div className="flex flex-col lg:flex-row flex-1 relative">
-        {/* Map */}
         <div className="flex-1 relative" style={{ minHeight: "calc(100vh - 72px)" }}>
-          <MapContainer center={mapCenter} zoom={13} style={{ height: "100%", width: "100%", minHeight: "calc(100vh - 72px)" }} className="z-0">
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
+          {!mapsApiKey ? (
+            <div className="flex items-center justify-center h-[calc(100vh-72px)] bg-slate-100 text-slate-600 text-sm font-semibold">
+              Add VITE_GOOGLE_MAPS_API_KEY to show map.
+            </div>
+          ) : loadError ? (
+            <div className="flex items-center justify-center h-[calc(100vh-72px)] bg-slate-100 text-red-500 text-sm font-semibold">
+              Unable to load Google Maps.
+            </div>
+          ) : !isLoaded ? (
+            <div className="flex items-center justify-center h-[calc(100vh-72px)] bg-slate-100 text-slate-500 text-sm font-semibold">
+              Loading map...
+            </div>
+          ) : (
+            <GoogleMap
+              mapContainerStyle={mapContainerStyle}
+              center={mapCenter}
+              zoom={13}
+              onLoad={(map) => {
+                mapRef.current = map;
+                if (!booking && userPosition) {
+                  map.panTo(userPosition);
+                  map.setZoom(15);
+                }
+              }}
+              onUnmount={() => {
+                mapRef.current = null;
+              }}
+              options={{
+                fullscreenControl: false,
+                mapTypeControl: false,
+                streetViewControl: false,
+                zoomControl: false,
+              }}
+            >
+              {booking?.pickupCoords && (
+                <>
+                  <Marker
+                    position={booking.pickupCoords}
+                    icon={markerDot("#10b981", 7)}
+                    title={booking.pickup || "Pickup"}
+                  />
+                  <Marker
+                    position={booking.destCoords}
+                    icon={markerDot("#ef4444", 7)}
+                    title={booking.destination || "Destination"}
+                  />
+                  {bookingRoutePath.length > 0 && (
+                    <Polyline
+                      path={bookingRoutePath}
+                      options={{
+                        strokeColor: "#2563EB",
+                        strokeOpacity: 0.75,
+                        strokeWeight: 5,
+                      }}
+                    />
+                  )}
+                </>
+              )}
 
-            {/* Booking mode: route + markers */}
-            {booking?.pickupCoords && (
-              <>
-                <FitBounds bounds={mapBounds} />
-                <Marker position={[booking.pickupCoords.lat, booking.pickupCoords.lng]} icon={pickupMarkerIcon}>
-                  <Popup><div className="text-center"><strong className="text-green-700">🟢 Pickup</strong><br /><span className="text-sm">{booking.pickup}</span></div></Popup>
-                </Marker>
-                <Marker position={[booking.destCoords.lat, booking.destCoords.lng]} icon={destMarkerIcon}>
-                  <Popup><div className="text-center"><strong className="text-red-700">🔴 Destination</strong><br /><span className="text-sm">{booking.destination}</span></div></Popup>
-                </Marker>
-                {booking.routeCoordinates?.length > 0 && (
-                  <Polyline positions={booking.routeCoordinates} color="#2563EB" weight={5} opacity={0.75} />
-                )}
-              </>
-            )}
+              {!booking && (
+                <>
+                  {userPosition && (
+                    <Marker
+                      position={userPosition}
+                      icon={markerDot("#2563eb", 8)}
+                      title="Your Location"
+                    />
+                  )}
+                  {browseDestination && (
+                    <Marker
+                      position={{ lat: browseDestination.lat, lng: browseDestination.lng }}
+                      icon={markerDot("#ef4444", 7)}
+                      title={browseDestination.name}
+                    />
+                  )}
+                </>
+              )}
+            </GoogleMap>
+          )}
 
-            {/* Browser mode: user position + search destination */}
+          <div className="absolute right-4 top-4 z-1000 flex flex-col gap-2">
+            <button
+              onClick={() => mapRef.current?.setZoom((mapRef.current?.getZoom() || 13) + 1)}
+              className="p-2 bg-white rounded-lg shadow-lg hover:bg-gray-100"
+              title="Zoom In"
+            >
+              <ZoomIn size={20} className="text-gray-700" />
+            </button>
+            <button
+              onClick={() => mapRef.current?.setZoom((mapRef.current?.getZoom() || 13) - 1)}
+              className="p-2 bg-white rounded-lg shadow-lg hover:bg-gray-100"
+              title="Zoom Out"
+            >
+              <ZoomOut size={20} className="text-gray-700" />
+            </button>
             {!booking && (
-              <>
-                <FlyToLocation position={userPosition} />
-                <LocationMarker position={userPosition} setPosition={setUserPosition} />
-                {browseDestination && (
-                  <Marker position={[browseDestination.lat, browseDestination.lng]} icon={destMarkerIcon}>
-                    <Popup>
-                      <div className="text-center">
-                        <strong>{browseDestination.name}</strong><br />
-                        <button onClick={() => navigate(`/ride-search?destination=${encodeURIComponent(browseDestination.name)}`)} className="px-3 py-1 mt-2 text-sm text-white bg-black rounded hover:bg-gray-800">Book Ride Here</button>
-                      </div>
-                    </Popup>
-                  </Marker>
-                )}
-              </>
+              <button
+                onClick={handleLocateMe}
+                className="p-2 bg-white rounded-lg shadow-lg hover:bg-gray-100"
+                title="Find My Location"
+              >
+                <Locate size={20} className="text-gray-700" />
+              </button>
             )}
+          </div>
 
-            <MapControls onLocate={!booking ? handleLocateMe : null} />
-          </MapContainer>
-
-          {/* Search bar — browser mode only */}
           {!booking && (
             <div className="absolute top-4 left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:w-96 z-1000">
               <form onSubmit={handleSearchSubmit} className="p-4 bg-white shadow-lg rounded-2xl">
@@ -234,13 +272,23 @@ export default function MapPage() {
               </form>
             </div>
           )}
+
+          {!booking && browseDestination && (
+            <div className="absolute left-4 bottom-20 z-1000 rounded-xl bg-white shadow-lg px-4 py-3 max-w-xs">
+              <p className="text-sm font-semibold text-slate-800 truncate">{browseDestination.name}</p>
+              <button
+                onClick={() => navigate(`/ride-search?destination=${encodeURIComponent(browseDestination.name)}`)}
+                className="px-3 py-1 mt-2 text-sm text-white bg-black rounded hover:bg-gray-800"
+              >
+                Book Ride Here
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Booking Summary Panel */}
         {booking && (
           <div className="lg:w-96 bg-white shadow-xl border-t lg:border-t-0 lg:border-l border-gray-200 flex flex-col z-1000">
             {confirmed ? (
-              /* Success screen */
               <div className="flex flex-col items-center justify-center flex-1 p-8 text-center">
                 <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-4">
                   <CheckCircle className="w-12 h-12 text-green-500" />
@@ -255,12 +303,10 @@ export default function MapPage() {
                 <button onClick={() => navigate("/")} className="w-full py-3 bg-black text-white font-semibold rounded-xl hover:bg-gray-800 transition-colors">Back to Home</button>
               </div>
             ) : (
-              /* Summary */
               <div className="flex flex-col flex-1 p-6 overflow-y-auto">
                 <h2 className="text-xl font-bold text-black mb-1">Confirm Your Ride</h2>
                 <p className="text-sm text-gray-500 mb-6">Review your trip details before confirming</p>
 
-                {/* Route visual */}
                 <div className="relative pl-8 mb-6">
                   <div className="absolute left-2.75 top-4 bottom-4 w-0.5 bg-gray-300"></div>
                   <div className="flex items-start gap-3 mb-6">
@@ -277,7 +323,6 @@ export default function MapPage() {
                   </div>
                 </div>
 
-                {/* Trip details */}
                 <div className="bg-gray-50 rounded-2xl p-4 space-y-3 mb-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 text-gray-600"><Car size={16} /><span className="text-sm">Vehicle</span></div>
@@ -297,7 +342,6 @@ export default function MapPage() {
                   </div>
                 </div>
 
-                {/* ETA */}
                 <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-xl mb-6">
                   <Navigation size={18} className="text-blue-600 shrink-0" />
                   <p className="text-sm text-blue-800">Estimated pickup: <strong>3–5 minutes</strong></p>
@@ -316,7 +360,6 @@ export default function MapPage() {
           </div>
         )}
 
-        {/* Bottom bar — browser mode only */}
         {!booking && (
           <div className="fixed bottom-0 left-0 right-0 bg-white shadow-lg border-t border-gray-200 p-4 z-1000">
             <div className="flex items-center justify-between max-w-4xl gap-4 mx-auto">

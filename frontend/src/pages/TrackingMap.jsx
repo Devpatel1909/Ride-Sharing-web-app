@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+import { GoogleMap, Marker, Polyline, useJsApiLoader } from "@react-google-maps/api";
 import io from "socket.io-client";
 import {
   Navigation,
@@ -22,110 +20,26 @@ import {
 import Header from "../components/common/Header";
 import { riderAPI } from "../services/api";
 
-// ── Leaflet icon fix ──────────────────────────────────────────────────────────
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
-  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-});
+const mapContainerStyle = {
+  height: "calc(100vh - 10rem)",
+  width: "100%",
+};
 
-// ── Inject pulse-ring CSS once ────────────────────────────────────────────────
-if (typeof document !== "undefined" && !document.querySelector("#trk-pulse-style")) {
-  const s = document.createElement("style");
-  s.id = "trk-pulse-style";
-  s.innerHTML = `
-    @keyframes trkPulse { 0%{transform:scale(.85);opacity:.9} 70%{transform:scale(2.1);opacity:0} 100%{transform:scale(.85);opacity:0} }
-    .trk-pulse::after { content:''; position:absolute; inset:0; border-radius:50%;
-      animation:trkPulse 1.8s ease-out infinite; }
-    .trk-pulse-blue::after  { background:rgba(37,99,235,.45); }
-    .trk-pulse-green::after { background:rgba(5,150,105,.45); }
-  `;
-  document.head.appendChild(s);
-}
+function fitMapToPoints(map, points, hasFittedRef) {
+  if (!map || !points?.length || typeof window === "undefined" || !window.google) return;
 
-const riderIcon = new L.DivIcon({
-  html: `<div class="trk-pulse trk-pulse-blue" style="
-    position:relative;
-    background:linear-gradient(135deg,#2563eb,#7c3aed);
-    width:42px;height:42px;border-radius:50% 50% 50% 0;
-    transform:rotate(-45deg);border:3px solid #fff;
-    box-shadow:0 4px 16px rgba(37,99,235,.6);
-    display:flex;align-items:center;justify-content:center;">
-    <span style="transform:rotate(45deg);font-size:20px;line-height:1;">🚗</span>
-  </div>`,
-  iconSize: [42, 42],
-  iconAnchor: [21, 42],
-  popupAnchor: [0, -44],
-  className: "",
-});
+  if (points.length >= 2) {
+    const bounds = new window.google.maps.LatLngBounds();
+    points.forEach((p) => bounds.extend(p));
+    map.fitBounds(bounds, 70);
+    hasFittedRef.current = true;
+    return;
+  }
 
-const passengerIcon = new L.DivIcon({
-  html: `<div class="trk-pulse trk-pulse-green" style="
-    position:relative;
-    background:linear-gradient(135deg,#059669,#10b981);
-    width:38px;height:38px;border-radius:50%;
-    border:3px solid #fff;
-    box-shadow:0 4px 16px rgba(5,150,105,.6);
-    display:flex;align-items:center;justify-content:center;font-size:18px;line-height:1;">
-    👤
-  </div>`,
-  iconSize: [38, 38],
-  iconAnchor: [19, 19],
-  popupAnchor: [0, -22],
-  className: "",
-});
-
-const pickupPinIcon = new L.DivIcon({
-  html: `<div style="
-    background:#10b981;
-    width:18px;height:18px;border-radius:50% 50% 50% 0;
-    transform:rotate(-45deg);border:2px solid #fff;
-    box-shadow:0 2px 8px rgba(16,185,129,.5);">
-  </div>`,
-  iconSize: [18, 18],
-  iconAnchor: [9, 18],
-  popupAnchor: [0, -20],
-  className: "",
-});
-
-const destPinIcon = new L.DivIcon({
-  html: `<div style="
-    background:#ef4444;
-    width:18px;height:18px;border-radius:50% 50% 50% 0;
-    transform:rotate(-45deg);border:2px solid #fff;
-    box-shadow:0 2px 8px rgba(239,68,68,.5);">
-  </div>`,
-  iconSize: [18, 18],
-  iconAnchor: [9, 18],
-  popupAnchor: [0, -20],
-  className: "",
-});
-
-// Auto-fit/pan map when locations change
-function LiveMapController({ riderLoc, passengerLoc, pickupCoords, destCoords, rideStatus }) {
-  const map = useMap();
-  const fitted = useRef(false);
-
-  useEffect(() => {
-    // When in-progress: fit rider + destination; otherwise fit all points
-    const pts = (rideStatus === "in-progress"
-      ? [riderLoc, destCoords]
-      : [riderLoc, passengerLoc, pickupCoords, destCoords]
-    )
-      .filter(Boolean)
-      .map((p) => [p.lat, p.lng]);
-
-    if (pts.length >= 2) {
-      map.fitBounds(pts, { padding: [70, 70], maxZoom: 16 });
-      fitted.current = true;
-    } else if (!fitted.current && pts.length === 1) {
-      map.setView(pts[0], 15);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [riderLoc?.lat, riderLoc?.lng, passengerLoc?.lat, passengerLoc?.lng, rideStatus]);
-
-  return null;
+  if (!hasFittedRef.current && points.length === 1) {
+    map.setCenter(points[0]);
+    map.setZoom(15);
+  }
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -154,13 +68,21 @@ export default function TrackingMap() {
   const [socketConnected, setSocketConnected] = useState(false);
   const [liveDistance, setLiveDistance] = useState(null);   // km between rider & passenger
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
-  const [routeCoords, setRouteCoords] = useState([]);       // [[lat,lng],...] road path
+  const [routeCoords, setRouteCoords] = useState([]);       // [{lat,lng},...] road path
   const [mapCenter] = useState(
-    pickupCoords ? [pickupCoords.lat, pickupCoords.lng] : [20.5937, 78.9629]
+    pickupCoords ? { lat: pickupCoords.lat, lng: pickupCoords.lng } : { lat: 20.5937, lng: 78.9629 }
   );
 
   const socketRef = useRef(null);
   const gpsIntervalRef = useRef(null);
+  const mapRef = useRef(null);
+  const hasFittedMapRef = useRef(false);
+
+  const mapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
+  const { isLoaded, loadError } = useJsApiLoader({
+    id: "ride-tracking-google-map",
+    googleMapsApiKey: mapsApiKey,
+  });
 
   // Determine which token to use
   const token = role === "rider"
@@ -298,12 +220,34 @@ export default function TrackingMap() {
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
         if (data?.success && data.route?.coordinates?.length) {
-          // OSRM returns [lon, lat] — Leaflet needs [lat, lon]
-          setRouteCoords(data.route.coordinates.map(([lon, lat]) => [lat, lon]));
+          // OSRM returns [lon, lat] — Google Maps expects {lat, lng}
+          setRouteCoords(data.route.coordinates.map(([lon, lat]) => ({ lat, lng: lon })));
         }
       })
       .catch(() => {}); // Silently fall back to straight line
   }, [riderLoc?.lat, riderLoc?.lng, passengerLoc?.lat, passengerLoc?.lng, rideStatus]); // eslint-disable-line
+
+  useEffect(() => {
+    if (!mapRef.current || !isLoaded) return;
+
+    const points = (rideStatus === "in-progress"
+      ? [riderLoc, destCoords]
+      : [riderLoc, passengerLoc, pickupCoords, destCoords]
+    ).filter(Boolean);
+
+    fitMapToPoints(mapRef.current, points, hasFittedMapRef);
+  }, [
+    isLoaded,
+    rideStatus,
+    riderLoc?.lat,
+    riderLoc?.lng,
+    passengerLoc?.lat,
+    passengerLoc?.lng,
+    pickupCoords?.lat,
+    pickupCoords?.lng,
+    destCoords?.lat,
+    destCoords?.lng,
+  ]);
 
   // ── Google Maps navigation link ─────────────────────────────────────
   const googleMapsUrl = destCoords
@@ -346,6 +290,18 @@ export default function TrackingMap() {
     accepted:    "Rider on the way to pickup",
     "in-progress": "En route to destination",
     completed:   "Ride completed",
+  };
+
+  const getCircleIcon = (fillColor, scale = 8) => {
+    if (!isLoaded || typeof window === "undefined" || !window.google) return undefined;
+    return {
+      path: window.google.maps.SymbolPath.CIRCLE,
+      fillColor,
+      fillOpacity: 1,
+      strokeColor: "#ffffff",
+      strokeWeight: 2,
+      scale,
+    };
   };
 
   if (!rideId) {
@@ -409,125 +365,147 @@ export default function TrackingMap() {
 
       {/* ── Map ──────────────────────────────────────────────────────────── */}
       <div className="flex-1 mt-40">
-        <MapContainer
-          center={mapCenter}
-          zoom={14}
-          style={{ height: "calc(100vh - 10rem)", width: "100%" }}
-          className="z-0"
-        >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-
-          <LiveMapController
-            riderLoc={riderLoc}
-            passengerLoc={passengerLoc}
-            pickupCoords={pickupCoords}
-            destCoords={destCoords}
-            rideStatus={rideStatus}
-          />
-
-          {/* ── Pickup pin ───────────────────────────────────────── */}
-          {pickupCoords && (
-            <Marker position={[pickupCoords.lat, pickupCoords.lng]} icon={pickupPinIcon}>
-              <Popup>
-                <div className="py-1 text-center">
-                  <span className="font-bold text-emerald-700">📍 Pickup</span>
-                  {pickup && <p className="text-xs text-slate-500 mt-0.5 max-w-40">{pickup}</p>}
-                </div>
-              </Popup>
-            </Marker>
-          )}
-
-          {/* ── Destination pin ──────────────────────────────────── */}
-          {destCoords && (
-            <Marker position={[destCoords.lat, destCoords.lng]} icon={destPinIcon}>
-              <Popup>
-                <div className="py-1 text-center">
-                  <span className="font-bold text-red-600">🏁 Destination</span>
-                  {destination && <p className="text-xs text-slate-500 mt-0.5 max-w-40">{destination}</p>}
-                </div>
-              </Popup>
-            </Marker>
-          )}
-
-          {/* ── Rider marker ─────────────────────────────────────── */}
-          {riderLoc && (
-            <Marker position={[riderLoc.lat, riderLoc.lng]} icon={riderIcon}>
-              <Popup>
-                <div className="py-1 text-center">
-                  <span className="font-bold text-blue-700">🚗 {role === "rider" ? "You (Rider)" : (riderName || "Rider")}</span>
-                  {vehicleType && <p className="mt-1 text-xs text-slate-500">{vehicleType}{vehiclePlate ? ` · ${vehiclePlate}` : ""}</p>}
-                </div>
-              </Popup>
-            </Marker>
-          )}
-
-          {/* ── Passenger marker ─────────────────────────────────── */}
-          {passengerLoc && (
-            <Marker position={[passengerLoc.lat, passengerLoc.lng]} icon={passengerIcon}>
-              <Popup>
-                <div className="py-1 text-center">
-                  <span className="font-bold text-emerald-700">👤 {role === "passenger" ? "You" : "Passenger"}</span>
-                </div>
-              </Popup>
-            </Marker>
-          )}
-
-          {/* ── Road route (OSRM) — rider → passenger/destination ── */}
-          {routeCoords.length > 1 ? (
-            <>
-              {/* White glow under route */}
-              <Polyline
-                positions={routeCoords}
-                color="#ffffff"
-                weight={8}
-                opacity={0.55}
+        {!mapsApiKey ? (
+          <div className="flex items-center justify-center h-[calc(100vh-10rem)] bg-slate-100 text-slate-600 text-sm font-semibold">
+            Add VITE_GOOGLE_MAPS_API_KEY to show live map.
+          </div>
+        ) : loadError ? (
+          <div className="flex items-center justify-center h-[calc(100vh-10rem)] bg-slate-100 text-red-500 text-sm font-semibold">
+            Unable to load Google Maps.
+          </div>
+        ) : !isLoaded ? (
+          <div className="flex items-center justify-center h-[calc(100vh-10rem)] bg-slate-100">
+            <Loader className="w-5 h-5 text-blue-500 animate-spin" />
+          </div>
+        ) : (
+          <GoogleMap
+            mapContainerStyle={mapContainerStyle}
+            center={mapCenter}
+            zoom={14}
+            onLoad={(map) => {
+              mapRef.current = map;
+            }}
+            onUnmount={() => {
+              mapRef.current = null;
+            }}
+            options={{
+              fullscreenControl: false,
+              mapTypeControl: false,
+              streetViewControl: false,
+            }}
+          >
+            {/* ── Pickup pin ───────────────────────────────────────── */}
+            {pickupCoords && (
+              <Marker
+                position={pickupCoords}
+                icon={getCircleIcon("#10b981", 7)}
+                title={pickup || "Pickup"}
               />
-              {/* Solid route — blue when picking up, green when in-progress */}
-              <Polyline
-                positions={routeCoords}
-                color={rideStatus === "in-progress" ? "#10b981" : "#4f46e5"}
-                weight={5}
-                opacity={0.9}
+            )}
+
+            {/* ── Destination pin ──────────────────────────────────── */}
+            {destCoords && (
+              <Marker
+                position={destCoords}
+                icon={getCircleIcon("#ef4444", 7)}
+                title={destination || "Destination"}
               />
-            </>
-          ) : (
-            /* Fallback straight dashed line when OSRM not yet loaded */
-            riderLoc && (passengerLoc || destCoords) && (
+            )}
+
+            {/* ── Rider marker ─────────────────────────────────────── */}
+            {riderLoc && (
+              <Marker
+                position={riderLoc}
+                icon={getCircleIcon("#2563eb", 10)}
+                label={{
+                  text: "R",
+                  color: "#ffffff",
+                  fontWeight: "700",
+                }}
+                title={role === "rider" ? "You (Rider)" : (riderName || "Rider")}
+              />
+            )}
+
+            {/* ── Passenger marker ─────────────────────────────────── */}
+            {passengerLoc && (
+              <Marker
+                position={passengerLoc}
+                icon={getCircleIcon("#059669", 9)}
+                label={{
+                  text: "P",
+                  color: "#ffffff",
+                  fontWeight: "700",
+                }}
+                title={role === "passenger" ? "You" : "Passenger"}
+              />
+            )}
+
+            {/* ── Road route (OSRM) — rider → passenger/destination ── */}
+            {routeCoords.length > 1 ? (
               <>
                 <Polyline
-                  positions={[[riderLoc.lat, riderLoc.lng], [(passengerLoc || destCoords).lat, (passengerLoc || destCoords).lng]]}
-                  color="#ffffff"
-                  weight={6}
-                  opacity={0.4}
+                  path={routeCoords}
+                  options={{
+                    strokeColor: "#ffffff",
+                    strokeOpacity: 0.55,
+                    strokeWeight: 8,
+                  }}
                 />
                 <Polyline
-                  positions={[[riderLoc.lat, riderLoc.lng], [(passengerLoc || destCoords).lat, (passengerLoc || destCoords).lng]]}
-                  color={rideStatus === "in-progress" ? "#10b981" : "#4f46e5"}
-                  weight={3}
-                  opacity={0.7}
-                  dashArray="10, 8"
+                  path={routeCoords}
+                  options={{
+                    strokeColor: rideStatus === "in-progress" ? "#10b981" : "#4f46e5",
+                    strokeOpacity: 0.9,
+                    strokeWeight: 5,
+                  }}
                 />
               </>
-            )
-          )}
+            ) : (
+              riderLoc && (passengerLoc || destCoords) && (
+                <>
+                  <Polyline
+                    path={[riderLoc, passengerLoc || destCoords]}
+                    options={{
+                      strokeColor: "#ffffff",
+                      strokeOpacity: 0.4,
+                      strokeWeight: 6,
+                    }}
+                  />
+                  <Polyline
+                    path={[riderLoc, passengerLoc || destCoords]}
+                    options={{
+                      strokeColor: rideStatus === "in-progress" ? "#10b981" : "#4f46e5",
+                      strokeOpacity: 0.7,
+                      strokeWeight: 3,
+                      icons: [{
+                        icon: { path: "M 0,-1 0,1", strokeOpacity: 1, scale: 3 },
+                        offset: "0",
+                        repeat: "12px",
+                      }],
+                    }}
+                  />
+                </>
+              )
+            )}
 
-          {/* ── Full journey line pickup → destination (always shown as guide) ── */}
-          {pickupCoords && destCoords && (
-            <Polyline
-              positions={[
-                [pickupCoords.lat, pickupCoords.lng],
-                [destCoords.lat, destCoords.lng],
-              ]}
-              color="#94a3b8"
-              weight={2}
-              opacity={0.3}
-              dashArray="6, 10"
-            />
-          )}
-        </MapContainer>
+            {/* ── Full journey line pickup → destination (always shown as guide) ── */}
+            {pickupCoords && destCoords && (
+              <Polyline
+                path={[pickupCoords, destCoords]}
+                options={{
+                  strokeColor: "#94a3b8",
+                  strokeOpacity: 0.3,
+                  strokeWeight: 2,
+                  icons: [{
+                    icon: { path: "M 0,-1 0,1", strokeOpacity: 1, scale: 3 },
+                    offset: "0",
+                    repeat: "14px",
+                  }],
+                }}
+              />
+            )}
+          </GoogleMap>
+        )}
       </div>
 
       {/* ── Bottom info card ─────────────────────────────────────────────── */}

@@ -16,31 +16,38 @@ import {
   MapPin,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { MapContainer, TileLayer } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
+import { GoogleMap, useJsApiLoader } from "@react-google-maps/api";
 import io from "socket.io-client";
 import Header from "../../components/common/Header";
 import { ridesAPI } from "../../services/api";
 
 // ─── Map background (outside component to avoid remount on re-render) ─────────
 function MapBg({ center }) {
+  const mapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
+  const { isLoaded } = useJsApiLoader({
+    id: "ride-search-map-bg",
+    googleMapsApiKey: mapsApiKey,
+  });
+
+  const centerObj = { lat: center[0], lng: center[1] };
+
   return (
     <div className="fixed inset-0 -z-10">
-      <MapContainer
-        key={`${center[0]}-${center[1]}`}
-        center={center}
-        zoom={13}
-        zoomControl={false}
-        dragging={false}
-        scrollWheelZoom={false}
-        doubleClickZoom={false}
-        touchZoom={false}
-        keyboard={false}
-        attributionControl={false}
-        style={{ width: "100%", height: "100%" }}
-      >
-        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-      </MapContainer>
+      {mapsApiKey && isLoaded && (
+        <GoogleMap
+          mapContainerStyle={{ width: "100%", height: "100%" }}
+          center={centerObj}
+          zoom={13}
+          options={{
+            disableDefaultUI: true,
+            draggable: false,
+            scrollwheel: false,
+            disableDoubleClickZoom: true,
+            keyboardShortcuts: false,
+            gestureHandling: "none",
+          }}
+        />
+      )}
       {/* Frosted overlay for readability */}
       <div className="absolute inset-0 bg-white/65 backdrop-blur-[2px]" />
       {/* Gradient orbs */}
@@ -452,18 +459,49 @@ export default function RideSearch() {
       const place = data.place || {};
       const addr  = place.address || {};
 
-      // 1. Prefer specific place name (landmark / building) if it differs from display_name
-      if (place.name && place.name !== place.display_name) return place.name;
+      const normalize = (value) => String(value || "").trim();
+      const lower = (value) => normalize(value).toLowerCase();
+      const genericNames = new Set([
+        "ground",
+        "road",
+        "street",
+        "unnamed road",
+        "unknown",
+        "building",
+        "plot",
+      ]);
 
-      // 2. Build from address components (same order as Landing.jsx)
+      // Prefer structured address parts for better precision.
       const parts = [];
-      if (addr.building)                         parts.push(addr.building);
-      if (addr.road)                             parts.push(addr.road);
-      if (addr.suburb || addr.neighbourhood)     parts.push(addr.suburb || addr.neighbourhood);
-      if (addr.city   || addr.town || addr.village) parts.push(addr.city || addr.town || addr.village);
-      if (parts.length > 0) return parts.join(", ");
+      const houseNumber = normalize(addr.house_number);
+      const houseName = normalize(addr.house || addr.building || addr.amenity);
+      const road = normalize(addr.road || addr.pedestrian || addr.footway);
+      const locality = normalize(addr.neighbourhood || addr.suburb || addr.city_district);
+      const city = normalize(addr.city || addr.town || addr.village || addr.county);
+      const state = normalize(addr.state);
+      const postcode = normalize(addr.postcode);
 
-      // 3. Fallback to full display name
+      if (houseNumber && road) {
+        parts.push(`${houseNumber} ${road}`);
+      } else {
+        if (houseName && !genericNames.has(lower(houseName))) parts.push(houseName);
+        if (road) parts.push(road);
+      }
+      if (locality) parts.push(locality);
+      if (city) parts.push(city);
+      if (state) parts.push(state);
+      if (postcode) parts.push(postcode);
+
+      const uniqueParts = Array.from(new Set(parts.filter(Boolean)));
+      if (uniqueParts.length > 0) return uniqueParts.join(", ");
+
+      // Fallback to place name only if not generic.
+      const placeName = normalize(place.name);
+      if (placeName && !genericNames.has(lower(placeName)) && placeName !== place.display_name) {
+        return placeName;
+      }
+
+      // Final API fallback.
       if (place.display_name) return place.display_name;
     } catch { /* ignore, fall through */ }
 
