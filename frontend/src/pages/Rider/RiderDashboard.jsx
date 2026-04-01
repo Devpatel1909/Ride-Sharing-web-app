@@ -16,9 +16,9 @@ export default function RiderDashboard() {
   const [stats, setStats] = useState(null);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [recentActivities, setRecentActivities] = useState([]);
-  // Initialize isOnline from localStorage to persist across refreshes
+  // Initialize isOnline from sessionStorage to persist across refreshes
   const [isOnline, setIsOnline] = useState(() => {
-    const saved = localStorage.getItem('riderIsOnline');
+    const saved = sessionStorage.getItem('riderIsOnline');
     return saved === 'true';
   });
   const [socket, setSocket] = useState(null);
@@ -36,8 +36,8 @@ export default function RiderDashboard() {
 
   // Socket.IO connection - separate from data fetching
   useEffect(() => {
-    const riderToken = localStorage.getItem('riderToken');
-    const rider = localStorage.getItem('rider');
+    const riderToken = sessionStorage.getItem('riderToken');
+    const rider = sessionStorage.getItem('rider');
 
     if (!riderToken) {
       navigate('/rider-login');
@@ -120,7 +120,7 @@ export default function RiderDashboard() {
 
   // Fetch dashboard data - separate effect
   useEffect(() => {
-    const riderToken = localStorage.getItem('riderToken');
+    const riderToken = sessionStorage.getItem('riderToken');
     if (riderToken) {
       fetchDashboardData({ showLoader: true });
     }
@@ -226,7 +226,7 @@ export default function RiderDashboard() {
       // Update isOnline from database (persist actual status from DB)
       if (statsData.stats && typeof statsData.stats.isOnline === 'boolean') {
         setIsOnline(statsData.stats.isOnline);
-        localStorage.setItem('riderIsOnline', statsData.stats.isOnline.toString());
+        sessionStorage.setItem('riderIsOnline', statsData.stats.isOnline.toString());
         
         // 🚀 Console: Log dashboard data load
         console.group('📊 Rider Dashboard Data Loaded');
@@ -272,11 +272,11 @@ export default function RiderDashboard() {
       if (newStatus) {
         lastLocationSyncAtRef.current = Date.now();
       }
-      // Persist to localStorage
-      localStorage.setItem('riderIsOnline', newStatus.toString());
+      // Persist to sessionStorage
+      sessionStorage.setItem('riderIsOnline', newStatus.toString());
       
       console.log('✅ Status Update Successful!');
-      console.log('💾 Saved to localStorage:', newStatus);
+      console.log('💾 Saved to sessionStorage:', newStatus);
       console.groupEnd();
       
       if (newStatus) {
@@ -288,9 +288,9 @@ export default function RiderDashboard() {
       console.error('❌ Failed to update availability:', error);
 
       if (error?.status === 401 || error?.status === 403) {
-        localStorage.removeItem('riderToken');
-        localStorage.removeItem('rider');
-        localStorage.removeItem('riderIsOnline');
+        sessionStorage.removeItem('riderToken');
+        sessionStorage.removeItem('rider');
+        sessionStorage.removeItem('riderIsOnline');
         alert('Your rider session expired. Please login again.');
         navigate('/rider-login', { replace: true });
         return;

@@ -85,10 +85,10 @@ export default function MapPage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("riderToken");
-    localStorage.removeItem("user");
-    localStorage.removeItem("rider");
+    sessionStorage.removeItem("token");
+    sessionStorage.removeItem("riderToken");
+    sessionStorage.removeItem("user");
+    sessionStorage.removeItem("rider");
     navigate("/", { replace: true });
   };
 

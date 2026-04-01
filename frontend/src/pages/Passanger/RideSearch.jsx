@@ -371,7 +371,7 @@ export default function RideSearch() {
   useEffect(() => {
     if (step !== 3 || !booked?.rideId) return;
 
-    const userRaw = localStorage.getItem("user");
+    const userRaw = sessionStorage.getItem("user");
     const userData = userRaw ? JSON.parse(userRaw) : null;
     const userId = userData?.id;
     const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
@@ -668,7 +668,7 @@ export default function RideSearch() {
     const searchRideType = rideType;
     const searchPassengers = passengers;
 
-    const token = localStorage.getItem("token");
+    const token = sessionStorage.getItem("token");
     if (!token) {
       alert("Please login as a passenger first");
       navigate("/login");

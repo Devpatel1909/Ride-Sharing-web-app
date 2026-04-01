@@ -11,8 +11,8 @@ export default function GoogleAuthCallback() {
     const error = searchParams.get('error');
 
     if (token) {
-      // Store token in localStorage
-      localStorage.setItem('token', token);
+      // Store token in sessionStorage
+      sessionStorage.setItem('token', token);
       
       // Fetch user profile with the token
       fetch('http://localhost:3000/api/auth/profile', {
@@ -23,7 +23,7 @@ export default function GoogleAuthCallback() {
         .then(res => res.json())
         .then(data => {
           if (data.user) {
-            localStorage.setItem('user', JSON.stringify(data.user));
+            sessionStorage.setItem('user', JSON.stringify(data.user));
             // Navigate to home page
             navigate('/', { replace: true });
           } else {
