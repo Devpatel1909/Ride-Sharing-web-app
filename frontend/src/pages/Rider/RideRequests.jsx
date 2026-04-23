@@ -366,6 +366,9 @@ export default function RideRequests() {
                       <p className="text-5xl font-bold text-transparent bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text font-display">
                         {request.fare}
                       </p>
+                      <p className="mt-3 text-xs font-semibold text-slate-600">
+                        Payment: {(request.paymentMethod || 'cash').toUpperCase()}
+                      </p>
                     </div>
 
                     {activeTab === 'pending' && (

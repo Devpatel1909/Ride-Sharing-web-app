@@ -146,7 +146,6 @@ function StarRating({ rating }) {
 
 function VehicleCard({ vehicle, fare, isAvailable, isSelected, onSelect, riderCount, nearestRiders }) {
   const meta = VEHICLE_META[vehicle.id] || {};
-  const topRider = nearestRiders && nearestRiders.length > 0 ? nearestRiders[0] : null;
 
   return (
     <button
@@ -209,38 +208,6 @@ function VehicleCard({ vehicle, fare, isAvailable, isSelected, onSelect, riderCo
           )}
         </div>
       </div>
-
-      {/* ── Rider info strip (only when available and rider data exists) ── */}
-      {isAvailable && topRider && (
-        <div className={`mx-5 mb-4 rounded-xl px-4 py-3 flex items-center gap-3 ${
-          isSelected ? "bg-white/10" : "bg-slate-50 border border-slate-100"
-        }`}>
-          <RiderAvatar rider={topRider} />
-          <div className="flex-1 min-w-0">
-            <p className={`text-sm font-bold truncate ${isSelected ? "text-white" : "text-slate-800"}`}>
-              {topRider.name || "Driver"}
-            </p>
-            <p className={`text-xs truncate ${isSelected ? "text-white/70" : "text-slate-500"}`}>
-              {[topRider.vehicleModel, topRider.vehicleColor].filter(Boolean).join(" · ") || "Vehicle details pending"}
-            </p>
-          </div>
-          <div className="flex flex-col items-end gap-1 shrink-0">
-            <StarRating rating={topRider.rating} />
-            {topRider.distanceKm != null && (
-              <span className={`text-[11px] font-semibold ${isSelected ? "text-white/70" : "text-blue-600"}`}>
-                {topRider.distanceKm} km away
-              </span>
-            )}
-            {topRider.vehiclePlate && (
-              <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
-                isSelected ? "bg-white/20 text-white" : "bg-slate-200 text-slate-600"
-              }`}>
-                {topRider.vehiclePlate}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* ── Extra riders count ── */}
       {isAvailable && riderCount != null && riderCount > 1 && (
@@ -364,6 +331,8 @@ export default function RideSearch() {
   const [destCoords, setDestCoords] = useState(null);
   const [booked, setBooked] = useState(null);
   const [selectedRiderId, setSelectedRiderId] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [availabilityRefreshing, setAvailabilityRefreshing] = useState(false);
 
   const searchedDistance = parseFloat(searchSnapshot?.distance || searchResults?.distance || 0);
 
@@ -654,12 +623,85 @@ export default function RideSearch() {
     { id: "suv",  name: "SUV",  baseRate: 40, perKm: 20, capacity: 6 },
   ];
 
+  const paymentOptions = [
+    { id: "cash", label: "Cash" },
+    { id: "upi", label: "UPI" },
+    { id: "card", label: "Card" },
+    { id: "wallet", label: "Wallet" },
+  ];
+
   const selectedVehicleObj = vehicleOptions.find((v) => v.id === selectedVehicle);
   const selectedFare =
     selectedVehicleObj && searchResults
       ? selectedVehicleObj.baseRate +
         selectedVehicleObj.perKm * searchedDistance
       : null;
+
+  const refreshAvailability = useCallback(async () => {
+    if (!searchSnapshot?.pickup || !searchSnapshot?.destination || !searchSnapshot?.distance) {
+      return;
+    }
+
+    const pickupPoint = searchSnapshot.pickupCoords || pickupCoords;
+    if (pickupPoint?.lat == null || pickupPoint?.lng == null) {
+      return;
+    }
+
+    setAvailabilityRefreshing(true);
+    try {
+      const availability = await ridesAPI.checkAvailability(
+        searchSnapshot.pickup,
+        searchSnapshot.destination,
+        searchSnapshot.distance,
+        pickupPoint.lat,
+        pickupPoint.lng
+      );
+
+      setSearchResults((current) => ({
+        ...(current || {}),
+        distance: searchSnapshot.distance,
+        availableVehicles: availability.availableVehicles || [],
+        vehicleAvailability: availability.vehicleAvailability || {},
+        sharedAvailable: availability.sharedAvailable,
+        personalAvailable: availability.personalAvailable,
+        totalNearbyRiders: availability.totalNearbyRiders || 0,
+        radiusKm: availability.radiusKm || 2,
+        hasPickupCoords: availability.hasPickupCoords || false,
+      }));
+
+      if (selectedRiderId) {
+        const refreshedRiders = availability.vehicleAvailability?.[selectedVehicle]?.riders || [];
+        const stillOnline = refreshedRiders.some((rider) => rider.id === selectedRiderId);
+        if (!stillOnline) {
+          setSelectedRiderId(null);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to refresh availability:', error);
+    } finally {
+      setAvailabilityRefreshing(false);
+    }
+  }, [pickupCoords, searchSnapshot, selectedRiderId, selectedVehicle]);
+
+  useEffect(() => {
+    if (step !== 2 || !selectedVehicle || !searchSnapshot) {
+      return;
+    }
+
+    refreshAvailability();
+  }, [refreshAvailability, searchSnapshot, selectedVehicle, step]);
+
+  useEffect(() => {
+    if (step !== 2 || !searchSnapshot) {
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      refreshAvailability();
+    }, 5000);
+
+    return () => clearInterval(intervalId);
+  }, [refreshAvailability, searchSnapshot, step]);
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -769,9 +811,27 @@ export default function RideSearch() {
         fare: selectedFare.toFixed(2),
         rideType: searchSnapshot.rideType,
         vehicleType: selectedVehicle,
+        paymentMethod,
         pickupCoordinates: searchSnapshot.pickupCoords,
         selectedRiderId: selectedRiderId || undefined,
       });
+
+      if (result.requiresPayment && result.checkoutUrl) {
+        const paymentRideContext = {
+          rideId: result.rideId,
+          fare: selectedFare,
+          vehicleName: selectedVehicleObj?.name || selectedVehicle,
+          paymentMethod,
+          pickup: searchSnapshot.pickup,
+          destination: searchSnapshot.destination,
+          pickupCoords: searchSnapshot.pickupCoords,
+          destCoords: searchSnapshot.destCoords,
+        };
+        sessionStorage.setItem("pendingRidePayment", JSON.stringify(paymentRideContext));
+        window.location.href = result.checkoutUrl;
+        return;
+      }
+
       if (result.success) {
         const allRidersForVehicle = searchResults.vehicleAvailability?.[selectedVehicle]?.riders || [];
         const chosenRider = selectedRiderId
@@ -783,6 +843,7 @@ export default function RideSearch() {
           vehicleName: selectedVehicleObj.name,
           nearbyRiders: result.nearbyRiders,
           chosenRiderName: chosenRider?.name || null,
+          paymentMethod,
           pickup: searchSnapshot.pickup,
           destination: searchSnapshot.destination,
           pickupCoords: searchSnapshot.pickupCoords,
@@ -804,6 +865,7 @@ export default function RideSearch() {
     setSearchSnapshot(null);
     setPickupCoords(null); setDestCoords(null); setBooked(null);
     setSelectedRiderId(null);
+    setPaymentMethod("cash");
   };
 
   // Manual ride-status check (fallback for passenger)
@@ -859,6 +921,7 @@ export default function RideSearch() {
               <Detail label="Ride ID"        value={`#${booked.rideId}`} />
               <Detail label="Vehicle"         value={booked.vehicleName} />
               <Detail label="Fare"            value={`₹${booked.fare.toFixed(0)}`} highlight />
+              <Detail label="Payment"         value={(booked.paymentMethod || "cash").toUpperCase()} />
               {booked.chosenRiderName
                 ? <Detail label="Requested Rider" value={booked.chosenRiderName} />
                 : <Detail label="Riders notified" value={`${booked.nearbyRiders} rider(s)`} />
@@ -1179,14 +1242,18 @@ export default function RideSearch() {
 
                   {/* ── Rider selection panel ── */}
                   {selectedVehicle && (() => {
-                    const riders = searchResults.vehicleAvailability?.[selectedVehicle]?.riders || [];
+                    const riders = (searchResults.vehicleAvailability?.[selectedVehicle]?.riders || []).filter(
+                      (rider) => rider.isOnline === true
+                    );
                     if (riders.length === 0) return null;
                     return (
                       <div className="mt-2 rounded-2xl border-2 border-blue-200 bg-blue-50/60 overflow-hidden">
                         <div className="px-5 py-3 bg-linear-to-r from-blue-600 to-purple-700 flex items-center gap-2">
                           <Users className="w-4 h-4 text-white" />
                           <span className="text-white font-bold text-sm">Select Your Rider</span>
-                          <span className="ml-auto text-white/70 text-xs">{riders.length} available</span>
+                          <span className="ml-auto text-white/70 text-xs">
+                            {availabilityRefreshing ? "Refreshing..." : `${riders.length} available`}
+                          </span>
                         </div>
                         <div className="p-3 space-y-2">
                           {/* Any rider option */}
@@ -1259,6 +1326,26 @@ export default function RideSearch() {
                       </div>
                     );
                   })()}
+
+                  <div className="mt-2 rounded-2xl border border-slate-200 bg-white p-4">
+                    <p className="text-xs font-bold tracking-wide uppercase text-slate-500 mb-3">Payment Method</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {paymentOptions.map((option) => (
+                        <button
+                          key={option.id}
+                          type="button"
+                          onClick={() => setPaymentMethod(option.id)}
+                          className={`px-3 py-2 rounded-xl text-sm font-bold transition border ${
+                            paymentMethod === option.id
+                              ? "border-blue-600 bg-blue-600 text-white"
+                              : "border-slate-200 bg-slate-50 text-slate-700 hover:border-blue-300"
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                   {/* Warn when no riders are currently online */}

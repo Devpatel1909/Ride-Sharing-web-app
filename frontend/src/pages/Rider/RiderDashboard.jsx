@@ -711,6 +711,9 @@ export default function RiderDashboard() {
                           <span className="text-xs font-medium text-slate-600">{request.passenger_rating || '5.0'}</span>
                         </div>
                       </div>
+                      <div className="mt-2 text-xs font-semibold text-slate-600">
+                        Payment: {(request.paymentMethod || 'cash').toUpperCase()}
+                      </div>
                     </div>
                   ))}
                 </div>

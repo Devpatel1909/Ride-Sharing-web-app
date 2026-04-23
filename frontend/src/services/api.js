@@ -132,6 +132,17 @@ export const ridesAPI = {
   }
 };
 
+// Payments APIs
+export const paymentsAPI = {
+  cancelPendingPayment: async (rideId) => {
+    const response = await fetch(`${API_BASE_URL}/payments/ride/${rideId}/cancel`, {
+      method: 'POST',
+      headers: getAuthHeaders(false)
+    });
+    return handleResponse(response);
+  }
+};
+
 // User/Passenger APIs
 export const userAPI = {
   // Get user profile
@@ -156,5 +167,6 @@ export const userAPI = {
 export default {
   riderAPI,
   ridesAPI,
+  paymentsAPI,
   userAPI
 };

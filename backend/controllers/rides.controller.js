@@ -1,5 +1,14 @@
 const pool = require('../db/Connect_to_sql');
-const { emitNewRideRequest, emitRideAccepted } = require('../config/socket');
+const Stripe = require('stripe');
+const { notifyRidersForRide } = require('../services/ride-notification.service');
+
+const VALID_PAYMENT_METHODS = ['cash', 'upi', 'card', 'wallet'];
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+const getStripe = () => {
+  if (!process.env.STRIPE_SECRET_KEY) return null;
+  return new Stripe(process.env.STRIPE_SECRET_KEY);
+};
 
 // Helper function to calculate distance between two coordinates (Haversine formula)
 // Returns distance in kilometers
@@ -66,6 +75,7 @@ exports.checkAvailability = async (req, res) => {
         r.id,
         r.first_name,
         r.last_name,
+        r.is_online,
         r.vehicle_type,
         r.vehicle_model,
         r.vehicle_color,
@@ -125,6 +135,7 @@ exports.checkAvailability = async (req, res) => {
           profilePhoto: r.profile_photo || null,
           rating: parseFloat(r.rating) || 5.0,
           distanceKm: r.distanceKm,
+          isOnline: r.is_online === true || r.is_online === 1,
         }))
       };
     }
@@ -181,12 +192,25 @@ exports.bookRide = async (req, res) => {
       fare, 
       rideType, 
       vehicleType,
+      paymentMethod,
       pickupCoordinates, // { lat, lng }
       selectedRiderId    // optional: passenger-chosen rider
     } = req.body;
 
     if (!pickup || !destination || !distance || !fare || !rideType || !vehicleType) {
       return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const normalizedPaymentMethod = String(paymentMethod || '').toLowerCase();
+    if (!VALID_PAYMENT_METHODS.includes(normalizedPaymentMethod)) {
+      return res.status(400).json({
+        error: `Invalid payment method. Allowed values: ${VALID_PAYMENT_METHODS.join(', ')}`
+      });
+    }
+
+    const numericFare = parseFloat(fare);
+    if (!Number.isFinite(numericFare) || numericFare <= 0) {
+      return res.status(400).json({ error: 'Invalid fare amount' });
     }
 
     // Parse pickup coordinates if not provided directly
@@ -205,8 +229,8 @@ exports.bookRide = async (req, res) => {
     // Insert the ride into database
     const insertQuery = `
       INSERT INTO rides 
-      (passenger_id, pickup_location, destination, distance, fare, ride_type, vehicle_type, status, requested_at) 
-      VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', CURRENT_TIMESTAMP)
+      (passenger_id, pickup_location, destination, distance, fare, ride_type, vehicle_type, payment_method, payment_status, selected_rider_id, status, requested_at) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9, 'pending', CURRENT_TIMESTAMP)
       RETURNING id
     `;
 
@@ -217,117 +241,75 @@ exports.bookRide = async (req, res) => {
       distance, 
       fare, 
       rideType, 
-      vehicleType
+      vehicleType,
+      normalizedPaymentMethod,
+      selectedRiderId || null
     ]);
 
     const rideId = insertResult.rows[0].id;
 
-    // Get passenger details for notification
-    const passengerQuery = `SELECT full_name, phone FROM users WHERE id = $1`;
-    const passengerResult = await pool.query(passengerQuery, [passengerId]);
-    const passengerName = passengerResult.rows[0]?.full_name || 'Unknown';
-    const passengerPhone = passengerResult.rows[0]?.phone || '';
-
-    // Find riders to notify
-    let nearbyRiders = [];
-
-    // If passenger selected a specific rider, notify only that rider
-    if (selectedRiderId) {
-      const specificRiderQuery = `
-        SELECT id, first_name, last_name, current_location
-        FROM riders
-        WHERE id = $1 AND is_online = true
-      `;
-      const specificResult = await pool.query(specificRiderQuery, [selectedRiderId]);
-      if (specificResult.rows.length > 0) {
-        const r = specificResult.rows[0];
-        nearbyRiders = [{ id: r.id, name: `${r.first_name} ${r.last_name}`, distance: 'selected' }];
+    if (normalizedPaymentMethod !== 'cash') {
+      const stripe = getStripe();
+      if (!stripe) {
+        return res.status(500).json({
+          error: 'Stripe is not configured. Please set STRIPE_SECRET_KEY in backend environment.'
+        });
       }
-    } else if (pickupLat && pickupLng) {
-      // Find online riders within 5km radius (wider net)
-      const ridersQuery = `
-        SELECT 
-          id, 
-          current_location, 
-          vehicle_type,
-          first_name,
-          last_name
-        FROM riders
-        WHERE is_online = true
-        AND vehicle_type = $1
-        AND id NOT IN (
-          SELECT rider_id FROM rides 
-          WHERE status IN ('accepted', 'in-progress')
-          AND rider_id IS NOT NULL
-        )
-      `;
 
-      const ridersResult = await pool.query(ridersQuery, [vehicleType]);
-      
-      ridersResult.rows.forEach(rider => {
-        if (rider.current_location) {
-          const riderCoords = parseLocation(rider.current_location);
-          if (riderCoords) {
-            const distanceToRider = calculateDistance(
-              pickupLat, 
-              pickupLng, 
-              riderCoords.lat, 
-              riderCoords.lng
-            );
-            // Notify all riders within 5km
-            if (distanceToRider <= 5.0) {
-              nearbyRiders.push({
-                id: rider.id,
-                name: `${rider.first_name} ${rider.last_name}`,
-                distance: distanceToRider.toFixed(2)
-              });
-            }
-          } else {
-            // No parseable location — still notify
-            nearbyRiders.push({ id: rider.id, name: `${rider.first_name} ${rider.last_name}`, distance: 'unknown' });
+      const session = await stripe.checkout.sessions.create({
+        mode: 'payment',
+        line_items: [
+          {
+            price_data: {
+              currency: 'inr',
+              product_data: {
+                name: `Ride Booking #${rideId}`,
+                description: `${pickup} to ${destination}`
+              },
+              unit_amount: Math.round(numericFare * 100)
+            },
+            quantity: 1
           }
-        } else {
-          // No location set — still notify
-          nearbyRiders.push({ id: rider.id, name: `${rider.first_name} ${rider.last_name}`, distance: 'unknown' });
-        }
+        ],
+        metadata: {
+          rideId: String(rideId),
+          passengerId: String(passengerId),
+          preferredMethod: normalizedPaymentMethod
+        },
+        success_url: `${FRONTEND_URL}/payment/success?rideId=${rideId}&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${FRONTEND_URL}/payment/cancel?rideId=${rideId}`
       });
-    } else {
-      // Fallback: notify all online riders of that vehicle type
-      const ridersQuery = `
-        SELECT id, first_name, last_name
-        FROM riders
-        WHERE is_online = true
-        AND vehicle_type = $1
-        LIMIT 20
-      `;
-      const ridersResult = await pool.query(ridersQuery, [vehicleType]);
-      nearbyRiders = ridersResult.rows.map(r => ({
-        id: r.id,
-        name: `${r.first_name} ${r.last_name}`,
-        distance: 'unknown'
-      }));
+
+      await pool.query(
+        `
+          UPDATE rides
+          SET stripe_session_id = $1, updated_at = CURRENT_TIMESTAMP
+          WHERE id = $2
+        `,
+        [session.id, rideId]
+      );
+
+      return res.json({
+        success: true,
+        rideId,
+        requiresPayment: true,
+        checkoutUrl: session.url,
+        message: 'Ride created. Complete payment to dispatch the request to riders.'
+      });
     }
 
-    // Send notifications to nearby riders via Socket.IO
-    const rideData = {
-      id: rideId,
-      passenger: passengerName,
-      phone: passengerPhone,
+    const nearbyRiders = await notifyRidersForRide({
+      rideId,
+      passengerId,
       pickup,
       destination,
       distance,
       fare,
       rideType,
       vehicleType,
-      requestedAt: new Date()
-    };
-
-    // Emit to each nearby rider specifically
-    nearbyRiders.forEach(rider => {
-      emitNewRideRequest(rider.id, rideData);
+      pickupCoordinates: pickupLat && pickupLng ? { lat: pickupLat, lng: pickupLng } : null,
+      selectedRiderId: selectedRiderId || null
     });
-
-    console.log(`📢 Ride request ${rideId} sent to ${nearbyRiders.length} nearby riders`);
 
     res.json({ 
       success: true, 
@@ -393,6 +375,11 @@ exports.updateRideStatus = async (req, res) => {
       UPDATE rides 
       SET 
         status = $1,
+        payment_status = CASE
+          WHEN $1 = 'completed' THEN 'completed'
+          WHEN $1 = 'cancelled' THEN 'failed'
+          ELSE payment_status
+        END,
         completed_at = CASE WHEN $1 = 'completed' THEN CURRENT_TIMESTAMP ELSE completed_at END,
         updated_at = CURRENT_TIMESTAMP
       WHERE id = $2

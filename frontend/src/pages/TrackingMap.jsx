@@ -25,6 +25,65 @@ const mapContainerStyle = {
   width: "100%",
 };
 
+const VEHICLE_LABELS = {
+  bike: "BIKE",
+  moto: "BIKE",
+  auto: "AUTO",
+  car: "CAR",
+  suv: "SUV",
+};
+
+const VEHICLE_COLORS = {
+  bike: "#f59e0b",
+  moto: "#f59e0b",
+  auto: "#10b981",
+  car: "#2563eb",
+  suv: "#7c3aed",
+};
+
+const normalizeVehicleType = (value) => String(value || "car").toLowerCase();
+
+const getBearing = (from, to) => {
+  if (!from || !to) return 0;
+
+  const lat1 = (from.lat * Math.PI) / 180;
+  const lat2 = (to.lat * Math.PI) / 180;
+  const dLon = ((to.lng - from.lng) * Math.PI) / 180;
+
+  const y = Math.sin(dLon) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+  return (Math.atan2(y, x) * 180) / Math.PI;
+};
+
+const getVehicleMarkerIcon = (vehicleType, heading) => {
+  if (typeof window === "undefined" || !window.google) return undefined;
+
+  const normalizedType = normalizeVehicleType(vehicleType);
+  const label = VEHICLE_LABELS[normalizedType] || VEHICLE_LABELS.car;
+  const fillColor = VEHICLE_COLORS[normalizedType] || VEHICLE_COLORS.car;
+  const rotation = Number.isFinite(heading) ? heading : 0;
+
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72">
+      <g transform="rotate(${rotation} 36 36)">
+        <circle cx="36" cy="36" r="26" fill="${fillColor}" opacity="0.18"/>
+        <path d="M36 10 L48 30 L36 24 L24 30 Z" fill="${fillColor}" opacity="0.95"/>
+        <rect x="24" y="28" width="24" height="18" rx="6" fill="${fillColor}" opacity="0.95"/>
+        <rect x="28" y="31" width="16" height="7" rx="3" fill="#ffffff" opacity="0.96"/>
+        <circle cx="29" cy="49" r="4" fill="#0f172a"/>
+        <circle cx="43" cy="49" r="4" fill="#0f172a"/>
+      </g>
+      <text x="36" y="63" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="700" fill="${fillColor}">${label}</text>
+    </svg>
+  `.trim();
+
+  return {
+    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+    scaledSize: new window.google.maps.Size(44, 44),
+    anchor: new window.google.maps.Point(22, 22),
+  };
+};
+
 function fitMapToPoints(map, points, hasFittedRef) {
   if (!map || !points?.length || typeof window === "undefined" || !window.google) return;
 
@@ -69,6 +128,7 @@ export default function TrackingMap() {
   const [liveDistance, setLiveDistance] = useState(null);   // km between rider & passenger
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [routeCoords, setRouteCoords] = useState([]);       // [{lat,lng},...] road path
+  const [riderHeading, setRiderHeading] = useState(0);
   const [mapCenter] = useState(
     pickupCoords ? { lat: pickupCoords.lat, lng: pickupCoords.lng } : { lat: 20.5937, lng: 78.9629 }
   );
@@ -77,6 +137,7 @@ export default function TrackingMap() {
   const gpsIntervalRef = useRef(null);
   const mapRef = useRef(null);
   const hasFittedMapRef = useRef(false);
+  const riderPreviousLocationRef = useRef(null);
 
   const mapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
   const { isLoaded, loadError } = useJsApiLoader({
@@ -174,6 +235,23 @@ export default function TrackingMap() {
   // ── Determine marker positions ───────────────────────────────────────────
   const riderLoc  = role === "rider"  ? myLocation  : otherLocation;
   const passengerLoc = role === "passenger" ? myLocation : otherLocation;
+
+  useEffect(() => {
+    if (!riderLoc) return;
+
+    const previous = riderPreviousLocationRef.current;
+    const target = rideStatus === "in-progress"
+      ? destCoords
+      : (passengerLoc || destCoords);
+
+    if (previous) {
+      setRiderHeading(getBearing(previous, riderLoc));
+    } else if (target) {
+      setRiderHeading(getBearing(riderLoc, target));
+    }
+
+    riderPreviousLocationRef.current = riderLoc;
+  }, [riderLoc?.lat, riderLoc?.lng, passengerLoc?.lat, passengerLoc?.lng, destCoords?.lat, destCoords?.lng, rideStatus]);
 
   // ── Live distance: to passenger when accepted, to destination when in-progress ──
   useEffect(() => {
@@ -416,12 +494,7 @@ export default function TrackingMap() {
             {riderLoc && (
               <Marker
                 position={riderLoc}
-                icon={getCircleIcon("#2563eb", 10)}
-                label={{
-                  text: "R",
-                  color: "#ffffff",
-                  fontWeight: "700",
-                }}
+                icon={getVehicleMarkerIcon(vehicleType, riderHeading)}
                 title={role === "rider" ? "You (Rider)" : (riderName || "Rider")}
               />
             )}
