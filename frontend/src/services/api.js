@@ -3,8 +3,8 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000
 // Helper to get auth headers
 const getAuthHeaders = (isRider = false) => {
   const token = isRider 
-    ? sessionStorage.getItem('riderToken') 
-    : sessionStorage.getItem('token');
+    ? localStorage.getItem('riderToken') 
+    : localStorage.getItem('token');
   
   return {
     'Authorization': `Bearer ${token}`,

@@ -8,10 +8,10 @@ export default function Profile() {
   
   // Initialize user data on mount
   const getUserData = () => {
-    const token = sessionStorage.getItem('token');
-    const riderToken = sessionStorage.getItem('riderToken');
-    const user = sessionStorage.getItem('user');
-    const rider = sessionStorage.getItem('rider');
+    const token = localStorage.getItem('token');
+    const riderToken = localStorage.getItem('riderToken');
+    const user = localStorage.getItem('user');
+    const rider = localStorage.getItem('rider');
 
     if (!token && !riderToken) {
       return null;
@@ -41,8 +41,8 @@ export default function Profile() {
 
   useEffect(() => {
     // Check authentication
-    const token = sessionStorage.getItem('token');
-    const riderToken = sessionStorage.getItem('riderToken');
+    const token = localStorage.getItem('token');
+    const riderToken = localStorage.getItem('riderToken');
 
     if (!token && !riderToken) {
       // Not authenticated, redirect to login
@@ -52,10 +52,10 @@ export default function Profile() {
 
   const handleLogout = () => {
     // Clear all auth data
-    sessionStorage.removeItem('token');
-    sessionStorage.removeItem('riderToken');
-    sessionStorage.removeItem('user');
-    sessionStorage.removeItem('rider');
+    localStorage.removeItem('token');
+    localStorage.removeItem('riderToken');
+    localStorage.removeItem('user');
+    localStorage.removeItem('rider');
     
     // Redirect to home
     navigate('/');
