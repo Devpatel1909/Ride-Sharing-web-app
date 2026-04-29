@@ -417,7 +417,7 @@ export default function RideSearch() {
       clearInterval(pollInterval);
       socket.disconnect();
     };
-  }, [step, booked?.rideId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [step, booked?.rideId, paymentMethod, navigate]); // Add paymentMethod to prevent stale closure
   // ── Shared reverse-geocode helper (same logic as Landing.jsx findNearestPlace) ──
   const resolveAddress = useCallback(async (lat, lon) => {
     try {
@@ -816,21 +816,9 @@ export default function RideSearch() {
         selectedRiderId: selectedRiderId || undefined,
       });
 
-      if (result.requiresPayment && result.checkoutUrl) {
-        const paymentRideContext = {
-          rideId: result.rideId,
-          fare: selectedFare,
-          vehicleName: selectedVehicleObj?.name || selectedVehicle,
-          paymentMethod,
-          pickup: searchSnapshot.pickup,
-          destination: searchSnapshot.destination,
-          pickupCoords: searchSnapshot.pickupCoords,
-          destCoords: searchSnapshot.destCoords,
-        };
-        sessionStorage.setItem("pendingRidePayment", JSON.stringify(paymentRideContext));
-        window.location.href = result.checkoutUrl;
-        return;
-      }
+      // We no longer redirect to payment immediately.
+      // Every ride booking now moves to Step 3 (Waiting for rider acceptance).
+      // Redirection to Stripe happens in the background when a rider accepts.
 
       if (result.success) {
         const allRidersForVehicle = searchResults.vehicleAvailability?.[selectedVehicle]?.riders || [];
@@ -1327,25 +1315,6 @@ export default function RideSearch() {
                     );
                   })()}
 
-                  <div className="mt-2 rounded-2xl border border-slate-200 bg-white p-4">
-                    <p className="text-xs font-bold tracking-wide uppercase text-slate-500 mb-3">Payment Method</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {paymentOptions.map((option) => (
-                        <button
-                          key={option.id}
-                          type="button"
-                          onClick={() => setPaymentMethod(option.id)}
-                          className={`px-3 py-2 rounded-xl text-sm font-bold transition border ${
-                            paymentMethod === option.id
-                              ? "border-blue-600 bg-blue-600 text-white"
-                              : "border-slate-200 bg-slate-50 text-slate-700 hover:border-blue-300"
-                          }`}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
                 </div>
 
                   {/* Warn when no riders are currently online */}
