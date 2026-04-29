@@ -5,83 +5,81 @@ import Header from '../../components/common/Header';
 import { paymentsAPI } from '../../services/api';
 
 export default function PaymentCancel() {
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [isRetrying, setIsRetrying] = useState(false);
-  const [error, setError] = useState('');
+  const [searchParams] = useSearchParams();
 
-  const pendingRidePayment = useMemo(() => {
+  const rideIdFromQuery = searchParams.get('rideId');
+  const pendingRaw = sessionStorage.getItem('pendingRidePayment');
+  const pending = useMemo(() => {
     try {
-      const raw = sessionStorage.getItem('pendingRidePayment');
-      return raw ? JSON.parse(raw) : null;
+      return pendingRaw ? JSON.parse(pendingRaw) : null;
     } catch {
       return null;
     }
-  }, []);
+  }, [pendingRaw]);
 
-  const rideId = Number(searchParams.get('rideId') || pendingRidePayment?.rideId);
+  const rideId = rideIdFromQuery || pending?.rideId;
+  const [isCancelling, setIsCancelling] = useState(false);
 
-  const retryPayment = async () => {
-    if (!rideId) return;
-
-    try {
-      setError('');
-      setIsRetrying(true);
-      const result = await paymentsAPI.createCheckoutSession(rideId);
-      if (result?.checkoutUrl) {
-        window.location.href = result.checkoutUrl;
-        return;
+  useEffect(() => {
+    const cancelPending = async () => {
+      if (!rideId) return;
+      setIsCancelling(true);
+      try {
+        await paymentsAPI.cancelPendingPayment(rideId);
+      } catch {
+        // No-op: cancellation is best-effort for UX consistency.
+      } finally {
+        setIsCancelling(false);
       }
-      setError('Could not open payment gateway. Please try again.');
-    } catch (e) {
-      setError(e.message || 'Failed to retry payment');
-    } finally {
-      setIsRetrying(false);
-    }
+    };
+
+    cancelPending();
+  }, [rideId]);
+
+  const handleBack = () => {
+    sessionStorage.removeItem('pendingRidePayment');
+    navigate('/ride-search');
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-rose-50 via-white to-amber-50">
+    <div className="min-h-screen bg-slate-50">
       <Header />
-      <main className="max-w-2xl mx-auto px-4 pt-28 pb-12">
-        <div className="rounded-3xl border border-rose-200 bg-white shadow-xl p-8">
+      <main className="max-w-xl mx-auto px-4 pt-28 pb-8">
+        <div className="bg-white rounded-2xl border border-slate-200 p-6">
           <div className="flex items-center gap-3 mb-4">
-            <AlertCircle className="w-8 h-8 text-rose-600" />
-            <h1 className="text-2xl font-bold text-slate-900">Payment Not Completed</h1>
+            <AlertCircle className="w-8 h-8 text-amber-500" />
+            <div>
+              <h1 className="text-xl font-bold text-slate-900">Payment Cancelled</h1>
+              <p className="text-sm text-slate-500">No charge was completed.</p>
+            </div>
           </div>
 
-          <p className="text-slate-600 mb-6">
-            Your rider is waiting. Complete payment to continue with this ride.
-          </p>
-
-          <div className="rounded-xl bg-amber-50 border border-amber-100 p-4 mb-6 text-sm text-amber-700 font-semibold">
-            Ride ID: #{rideId || 'N/A'}
+          <div className="rounded-xl bg-amber-50 border border-amber-100 p-4 text-sm font-medium text-amber-700">
+            {isCancelling ? (
+              <span className="inline-flex items-center gap-2">
+                <Loader className="w-4 h-4 animate-spin" />
+                Cleaning up pending payment...
+              </span>
+            ) : (
+              'You can try booking again and choose the same or a different payment method.'
+            )}
           </div>
 
-          {error && <p className="text-sm text-rose-600 mb-4">{error}</p>}
-
-          <div className="flex gap-3">
-            <button
-              onClick={retryPayment}
-              disabled={isRetrying || !rideId}
-              className="flex-1 py-3 rounded-xl font-bold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50"
-            >
-              {isRetrying ? 'Opening gateway...' : 'Retry Payment'}
-            </button>
-            <button
-              onClick={() => navigate('/ride-search')}
-              className="px-4 py-3 rounded-xl border border-slate-300 font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              Back to Ride Search
-            </button>
-          </div>
-
-          {isRetrying && (
-            <div className="mt-4 flex items-center gap-2 text-sm text-slate-500">
-              <Loader className="w-4 h-4 animate-spin" />
-              Redirecting to Stripe checkout...
+          {pending && (
+            <div className="mt-4 space-y-2 text-sm text-slate-700">
+              <p><span className="font-semibold">Ride:</span> #{pending.rideId}</p>
+              <p><span className="font-semibold">Vehicle:</span> {pending.vehicleName}</p>
+              <p><span className="font-semibold">Fare:</span> ₹{Number(pending.fare || 0).toFixed(0)}</p>
             </div>
           )}
+
+          <button
+            onClick={handleBack}
+            className="mt-6 w-full px-4 py-3 rounded-xl bg-blue-600 text-white font-semibold"
+          >
+            Back to Ride Search
+          </button>
         </div>
       </main>
     </div>

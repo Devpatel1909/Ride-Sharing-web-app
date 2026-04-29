@@ -13,11 +13,10 @@
     "passport-google-oauth20": "^2.0.0",
     "pg": "^8.18.0",
     "socket.io": "^4.8.3",
-    "stripe": "^18.4.0"
+    "stripe": "^22.0.2"
   },
   "scripts": {
-    "start": "nodemon server.js",
-    "migrate:payments": "node migrations/run-payment-migration.js"
+    "start": "nodemon server.js"
   },
   "name": "backend",
   "version": "1.0.0",

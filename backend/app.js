@@ -5,7 +5,6 @@ const cors=require('cors');
 const express=require('express');
 const session=require('express-session');
 const passport=require('./config/passport');
-const paymentsController = require('./controllers/payments.controller');
 const app=express();
 
 // CORS configuration - must be before other middleware
@@ -33,9 +32,6 @@ app.use((req, res, next) => {
   );
   next();
 });
-
-// Stripe webhook must receive raw body for signature verification.
-app.post('/api/payments/stripe/webhook', express.raw({ type: 'application/json' }), paymentsController.handleStripeWebhook);
 
 app.use(express.json({ limit: '10mb' })); // Increase payload size limit for base64 images
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
@@ -66,10 +62,6 @@ app.use('/api/rider', riderRoutes);
 // rides routes
 const ridesRoutes = require('./routes/rides.routes');
 app.use('/api/rides', ridesRoutes);
-
-// payments routes
-const paymentsRoutes = require('./routes/payments.routes');
-app.use('/api/payments', paymentsRoutes);
 
 // geocoding routes
 const geocodingRoutes = require('./routes/geocoding.routes');

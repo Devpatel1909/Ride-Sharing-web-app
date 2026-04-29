@@ -9,12 +9,6 @@ CREATE TABLE IF NOT EXISTS rides (
   fare DECIMAL(10,2) NOT NULL,
   ride_type ENUM('shared', 'personal') NOT NULL,
   vehicle_type VARCHAR(50) NOT NULL,
-  payment_method VARCHAR(20) DEFAULT 'cash',
-  payment_status VARCHAR(20) DEFAULT 'completed',
-  stripe_session_id VARCHAR(255),
-  stripe_payment_intent_id VARCHAR(255),
-  payment_completed_at TIMESTAMP NULL,
-  payment_failed_reason TEXT,
   status ENUM('pending', 'accepted', 'in-progress', 'completed', 'cancelled') DEFAULT 'pending',
   requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   accepted_at TIMESTAMP NULL,
@@ -27,9 +21,7 @@ CREATE TABLE IF NOT EXISTS rides (
   INDEX idx_status (status),
   INDEX idx_rider (rider_id),
   INDEX idx_passenger (passenger_id),
-  INDEX idx_requested_at (requested_at),
-  INDEX idx_payment_status (payment_status),
-  INDEX idx_stripe_session (stripe_session_id)
+  INDEX idx_requested_at (requested_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Add columns to riders table for availability and location tracking
@@ -79,9 +71,7 @@ CREATE TRIGGER IF NOT EXISTS update_rider_stats_on_complete
 AFTER UPDATE ON rides
 FOR EACH ROW
 BEGIN
-  IF NEW.status = 'completed' 
-     AND OLD.status != 'completed'
-     AND (NEW.payment_method = 'cash' OR NEW.payment_status = 'completed') THEN
+  IF NEW.status = 'completed' AND OLD.status != 'completed' THEN
     UPDATE riders 
     SET 
       total_rides = total_rides + 1,

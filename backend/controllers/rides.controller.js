@@ -226,14 +226,11 @@ exports.bookRide = async (req, res) => {
       }
     }
 
-    const normalizedPaymentMethod = String(paymentMethod || 'cash').toLowerCase();
-    const paymentStatus = normalizedPaymentMethod === 'cash' ? 'completed' : 'pending';
-
     // Insert the ride into database
     const insertQuery = `
       INSERT INTO rides 
       (passenger_id, pickup_location, destination, distance, fare, ride_type, vehicle_type, payment_method, payment_status, selected_rider_id, status, requested_at) 
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending', CURRENT_TIMESTAMP)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9, 'pending', CURRENT_TIMESTAMP)
       RETURNING id
     `;
 
@@ -246,7 +243,6 @@ exports.bookRide = async (req, res) => {
       rideType, 
       vehicleType,
       normalizedPaymentMethod,
-      paymentStatus,
       selectedRiderId || null
     ]);
 
@@ -318,8 +314,6 @@ exports.bookRide = async (req, res) => {
     res.json({ 
       success: true, 
       rideId,
-      paymentMethod: normalizedPaymentMethod,
-      paymentStatus,
       nearbyRiders: nearbyRiders.length,
       ridersNotified: nearbyRiders.map(r => ({ id: r.id, name: r.name, distance: r.distance })),
       message: `Ride requested! ${nearbyRiders.length} nearby rider(s) notified.` 
@@ -375,24 +369,6 @@ exports.updateRideStatus = async (req, res) => {
     const validStatuses = ['in-progress', 'completed', 'cancelled'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
-    }
-
-    const rideCheckResult = await pool.query(
-      `SELECT payment_method, payment_status FROM rides WHERE id = $1`,
-      [rideId]
-    );
-
-    if (!rideCheckResult.rows.length) {
-      return res.status(404).json({ error: 'Ride not found' });
-    }
-
-    const paymentMethod = String(rideCheckResult.rows[0].payment_method || 'cash').toLowerCase();
-    const paymentStatus = String(rideCheckResult.rows[0].payment_status || 'pending').toLowerCase();
-
-    if (status === 'completed' && paymentMethod !== 'cash' && paymentStatus !== 'completed') {
-      return res.status(400).json({
-        error: 'Cannot complete this ride until passenger payment is completed'
-      });
     }
 
     const query = `
