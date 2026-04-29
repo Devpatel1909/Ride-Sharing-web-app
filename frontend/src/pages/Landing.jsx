@@ -30,8 +30,8 @@ export default function Landing() {
 
   // Check if rider is already logged in and redirect to dashboard
   useEffect(() => {
-    const riderToken = sessionStorage.getItem('riderToken');
-    const rider = sessionStorage.getItem('rider');
+    const riderToken = localStorage.getItem('riderToken');
+    const rider = localStorage.getItem('rider');
     
     if (riderToken && rider) {
       // Rider is logged in, redirect to dashboard
@@ -466,8 +466,8 @@ export default function Landing() {
 
   // Check if user is authenticated
   const handleSearchRide = () => {
-    const token = sessionStorage.getItem("token");
-    const riderToken = sessionStorage.getItem("riderToken");
+    const token = localStorage.getItem("token");
+    const riderToken = localStorage.getItem("riderToken");
 
     if (!token && !riderToken) {
       setAuthWarning("Please sign up or login to search for rides");

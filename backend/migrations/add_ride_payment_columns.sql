@@ -5,7 +5,8 @@ ADD COLUMN IF NOT EXISTS payment_status VARCHAR(20) DEFAULT 'completed',
 ADD COLUMN IF NOT EXISTS stripe_session_id VARCHAR(255),
 ADD COLUMN IF NOT EXISTS stripe_payment_intent_id VARCHAR(255),
 ADD COLUMN IF NOT EXISTS payment_completed_at TIMESTAMP,
-ADD COLUMN IF NOT EXISTS payment_failed_reason TEXT;
+ADD COLUMN IF NOT EXISTS payment_failed_reason TEXT,
+ADD COLUMN IF NOT EXISTS selected_rider_id INT;
 
 -- Backfill existing records for safe defaults
 UPDATE rides

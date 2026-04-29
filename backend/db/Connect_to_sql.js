@@ -7,6 +7,10 @@ const pool = new Pool({
   }
 });
 
+const testDatabaseConnection = async () => {
+  await pool.query('SELECT 1');
+};
+
 pool.on('connect', () => {
   console.log('Connected to the database');
 });
@@ -17,3 +21,4 @@ pool.on('error', (err) => {
 });
 
 module.exports = pool;
+module.exports.testDatabaseConnection = testDatabaseConnection;

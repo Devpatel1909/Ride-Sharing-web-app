@@ -207,6 +207,7 @@ exports.getRecentActivity = async (req, res) => {
         r.fare,
         r.ride_type,
         r.vehicle_type,
+        r.payment_method,
         r.status,
         r.completed_at,
         u.full_name as passenger_name
@@ -228,6 +229,8 @@ exports.getRecentActivity = async (req, res) => {
       fare: `₹${parseFloat(row.fare).toFixed(0)}`,
       rideType: row.ride_type,
       vehicleType: row.vehicle_type,
+      payment_method: row.payment_method,
+      paymentMethod: row.payment_method,
       status: row.status,
       completedAt: row.completed_at
     }));

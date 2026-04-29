@@ -324,3 +324,34 @@ exports.handleStripeWebhook = async (req, res) => {
     return res.status(500).json({ error: 'Webhook handling failed' });
   }
 };
+
+exports.cancelPendingPayment = async (req, res) => {
+  try {
+    const passengerId = req.user?.userId;
+    const { rideId } = req.params;
+
+    if (!passengerId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const result = await pool.query(
+      `UPDATE rides
+       SET payment_status = 'failed', updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1
+         AND passenger_id = $2
+         AND status = 'pending'
+         AND payment_status = 'pending'
+       RETURNING id`,
+      [rideId, passengerId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.json({ success: true, message: 'No pending payment to cancel' });
+    }
+
+    return res.json({ success: true, message: 'Pending payment cancelled' });
+  } catch (error) {
+    console.error('Error cancelling pending payment:', error);
+    return res.status(500).json({ error: 'Failed to cancel pending payment' });
+  }
+};

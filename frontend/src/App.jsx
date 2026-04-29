@@ -8,6 +8,8 @@ import Landing from './pages/Landing'
 // eslint-disable-next-line no-unused-vars
 import Rider_login from './pages/Rider/Signup'
 import RideSearch from './pages/Passanger/RideSearch'
+import PaymentSuccess from './pages/Passanger/PaymentSuccess'
+import PaymentCancel from './pages/Passanger/PaymentCancel'
 import RiderDashboard from './pages/Rider/RiderDashboard'
 import RideRequests from './pages/Rider/RideRequests'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -45,6 +47,16 @@ export default function App() {
         <Route path="/ride-search" element={
           <ProtectedRoute>
             <RideSearch />
+          </ProtectedRoute>
+        } />
+        <Route path="/payment/success" element={
+          <ProtectedRoute>
+            <PaymentSuccess />
+          </ProtectedRoute>
+        } />
+        <Route path="/payment/cancel" element={
+          <ProtectedRoute>
+            <PaymentCancel />
           </ProtectedRoute>
         } />
         <Route path="/map" element={

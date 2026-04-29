@@ -18,10 +18,10 @@ export default function RideShareHeader() {
   // Check authentication status
   useEffect(() => {
     const checkAuth = () => {
-      const token = sessionStorage.getItem('token');
-      const riderToken = sessionStorage.getItem('riderToken');
-      const user = sessionStorage.getItem('user');
-      const rider = sessionStorage.getItem('rider');
+      const token = localStorage.getItem('token');
+      const riderToken = localStorage.getItem('riderToken');
+      const user = localStorage.getItem('user');
+      const rider = localStorage.getItem('rider');
 
       if (token || riderToken) {
         setIsAuthenticated(true);
@@ -67,10 +67,10 @@ export default function RideShareHeader() {
   }, []);
 
   const handleLogout = () => {
-    sessionStorage.removeItem('token');
-    sessionStorage.removeItem('riderToken');
-    sessionStorage.removeItem('user');
-    sessionStorage.removeItem('rider');
+    localStorage.removeItem('token');
+    localStorage.removeItem('riderToken');
+    localStorage.removeItem('user');
+    localStorage.removeItem('rider');
     setIsAuthenticated(false);
     setUserName("");
     setShowProfileMenu(false);

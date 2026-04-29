@@ -10,6 +10,7 @@ CREATE TYPE notification_type AS ENUM ('ride_request', 'ride_accepted', 'ride_st
 CREATE TABLE IF NOT EXISTS rides (
   id SERIAL PRIMARY KEY,
   rider_id INT,
+  selected_rider_id INT,
   passenger_id INT NOT NULL,
   pickup_location VARCHAR(500) NOT NULL,
   destination VARCHAR(500) NOT NULL,

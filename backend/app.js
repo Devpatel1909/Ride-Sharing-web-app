@@ -14,6 +14,9 @@ app.use(cors({
   credentials: true
 }));
 
+// Stripe webhook needs raw body for signature verification.
+app.use('/api/payments/stripe/webhook', express.raw({ type: 'application/json' }));
+
 // Content Security Policy for Google OAuth
 app.use((req, res, next) => {
   res.setHeader(
@@ -71,6 +74,10 @@ app.use('/api/payments', paymentsRoutes);
 // geocoding routes
 const geocodingRoutes = require('./routes/geocoding.routes');
 app.use('/api/geocoding', geocodingRoutes);
+
+// payments routes
+const paymentsRoutes = require('./routes/payments.routes');
+app.use('/api/payments', paymentsRoutes);
 
 app.get('/',(req,res)=>{
     res.send('Hello World!');

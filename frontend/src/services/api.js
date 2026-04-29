@@ -3,8 +3,8 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000
 // Helper to get auth headers
 const getAuthHeaders = (isRider = false) => {
   const token = isRider 
-    ? sessionStorage.getItem('riderToken') 
-    : sessionStorage.getItem('token');
+    ? localStorage.getItem('riderToken') 
+    : localStorage.getItem('token');
   
   return {
     'Authorization': `Bearer ${token}`,
@@ -153,6 +153,14 @@ export const paymentsAPI = {
 
   getPaymentStatus: async (rideId) => {
     const response = await fetch(`${API_BASE_URL}/payments/status/${rideId}`, {
+      headers: getAuthHeaders(false)
+    });
+    return handleResponse(response);
+  },
+
+  cancelPendingPayment: async (rideId) => {
+    const response = await fetch(`${API_BASE_URL}/payments/ride/${rideId}/cancel`, {
+      method: 'POST',
       headers: getAuthHeaders(false)
     });
     return handleResponse(response);

@@ -28,8 +28,8 @@ export default function RideRequests() {
 
   // Socket.IO connection - runs once on mount
   useEffect(() => {
-    const riderToken = sessionStorage.getItem('riderToken');
-    const rider = sessionStorage.getItem('rider');
+    const riderToken = localStorage.getItem('riderToken');
+    const rider = localStorage.getItem('rider');
     
     if (!riderToken) {
       navigate('/rider-login');
@@ -211,7 +211,7 @@ export default function RideRequests() {
 
         // Find the accepted request so we can pass ride info to the tracking page
         const acceptedReq = rideRequests.find(r => r.id === rideId) || {};
-        const rider = sessionStorage.getItem('rider');
+        const rider = localStorage.getItem('rider');
         const riderData = rider ? JSON.parse(rider) : {};
 
         // Geocode pickup and destination so the tracking map can show the road route
@@ -501,6 +501,9 @@ export default function RideRequests() {
                       </p>
                       <p className="text-5xl font-bold text-transparent bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text font-display">
                         {request.fare}
+                      </p>
+                      <p className="mt-3 text-xs font-semibold text-slate-600">
+                        Payment: {(request.paymentMethod || 'cash').toUpperCase()}
                       </p>
                     </div>
 
