@@ -76,6 +76,28 @@ const emitRideAccepted = (passengerId, rideData) => {
   }
 };
 
+// Ask passenger to complete payment after rider acceptance
+const emitPaymentRequired = (passengerId, payload) => {
+  if (io) {
+    io.to(`passenger-${passengerId}`).emit('ride-payment-required', payload);
+    console.log(`💳 Payment required notification sent to passenger ${passengerId}`);
+  }
+};
+
+// Notify rider/passenger payment state transitions
+const emitPaymentStatusUpdate = ({ rideId, passengerId, riderId, paymentStatus, rideStatus, message }) => {
+  if (!io) return;
+
+  const payload = { rideId, paymentStatus, rideStatus, message };
+  if (passengerId) {
+    io.to(`passenger-${passengerId}`).emit('ride-payment-status', payload);
+  }
+  if (riderId) {
+    io.to(`rider-${riderId}`).emit('ride-payment-status', payload);
+  }
+  console.log(`💸 Ride ${rideId} payment status: ${paymentStatus}`);
+};
+
 // Emit ride status update
 const emitRideStatusUpdate = (rideId, status, userId, riderId) => {
   if (io) {
@@ -101,6 +123,8 @@ module.exports = {
   initializeSocket,
   emitNewRideRequest,
   emitRideAccepted,
+  emitPaymentRequired,
+  emitPaymentStatusUpdate,
   emitRideStatusUpdate,
   getIO
 };

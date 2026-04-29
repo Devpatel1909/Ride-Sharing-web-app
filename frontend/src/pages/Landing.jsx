@@ -75,6 +75,45 @@ export default function Landing() {
     },
   ];
 
+  const getCurrentPositionPromise = useCallback((options) => {
+    return new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, options);
+    });
+  }, []);
+
+  // Try multiple geolocation strategies and keep the most accurate fix.
+  const getBestCurrentLocation = useCallback(async () => {
+    const attempts = [
+      { enableHighAccuracy: true, timeout: 18000, maximumAge: 0 },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 180000 },
+    ];
+
+    let bestFix = null;
+    let lastError = null;
+
+    for (const options of attempts) {
+      try {
+        const position = await getCurrentPositionPromise(options);
+        if (!bestFix || position.coords.accuracy < bestFix.coords.accuracy) {
+          bestFix = position;
+        }
+
+        if (bestFix.coords.accuracy <= 35) {
+          break;
+        }
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    if (!bestFix) {
+      throw lastError || new Error('Unable to acquire location');
+    }
+
+    return bestFix;
+  }, [getCurrentPositionPromise]);
+
   // Function to find nearest place/landmark from coordinates
   const findNearestPlace = async (lat, lon) => {
     try {
@@ -92,26 +131,34 @@ export default function Landing() {
         const reverseResult = await reverseResponse.json();
         const reverseData = reverseResult.place || {};
         const address = reverseData.address || {};
-        const name = reverseData.name;
+        const normalize = (value) => String(value || '').trim();
+        const parts = [];
 
-        if (name && name !== reverseData.display_name) {
-          return name;
+        const houseNumber = normalize(address.house_number);
+        const road = normalize(address.road || address.pedestrian || address.footway);
+        const locality = normalize(address.neighbourhood || address.suburb || address.city_district);
+        const city = normalize(address.city || address.town || address.village || address.county);
+        const state = normalize(address.state);
+        const postcode = normalize(address.postcode);
+
+        if (houseNumber && road) {
+          parts.push(`${houseNumber} ${road}`);
+        } else {
+          if (normalize(address.building)) parts.push(normalize(address.building));
+          if (road) parts.push(road);
         }
 
-        const parts = [];
-        if (address.building) parts.push(address.building);
-        if (address.road) parts.push(address.road);
-        if (address.suburb || address.neighbourhood)
-          parts.push(address.suburb || address.neighbourhood);
-        if (address.city || address.town || address.village)
-          parts.push(address.city || address.town || address.village);
+        if (locality) parts.push(locality);
+        if (city) parts.push(city);
+        if (state) parts.push(state);
+        if (postcode) parts.push(postcode);
 
         if (parts.length > 0) {
-          return parts.join(", ");
+          return Array.from(new Set(parts)).join(', ');
         }
 
         if (reverseData.display_name) {
-          return reverseData.display_name;
+          return reverseData.display_name.split(',').slice(0, 4).join(',').trim();
         }
       }
 
@@ -131,49 +178,47 @@ export default function Landing() {
         return;
       }
 
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const { latitude, longitude } = position.coords;
-          setCurrentCoords({ lat: latitude, lon: longitude });
+      try {
+        const position = await getBestCurrentLocation();
+        const { latitude, longitude, accuracy } = position.coords;
+        setCurrentCoords({ lat: latitude, lon: longitude });
 
-          const nearestPlace = await findNearestPlace(latitude, longitude);
-          setPickupLocation(nearestPlace);
-          setLocationLoading(false);
+        const nearestPlace = await findNearestPlace(latitude, longitude);
+        setPickupLocation(nearestPlace);
+        setLocationLoading(false);
+
+        if (accuracy > 120) {
+          setLocationError('Location was detected but GPS accuracy is low. Tap "Use my location" again for a better fix.');
+        } else {
           setLocationError(null);
-        },
-        (error) => {
-          console.error("Error getting location:", error);
-          let errorMessage = "";
-          switch (error.code) {
-            case error.PERMISSION_DENIED:
-              errorMessage =
-                "Location access denied. You can still search manually.";
-              break;
-            case error.POSITION_UNAVAILABLE:
-              errorMessage =
-                "Location unavailable. Please enter address manually.";
-              break;
-            case error.TIMEOUT:
-              errorMessage =
-                "Location request timed out. Please enter address manually.";
-              break;
-            default:
-              errorMessage =
-                "Unable to get location. Please enter address manually.";
-          }
-          setLocationError(errorMessage);
-          setLocationLoading(false);
-        },
-        {
-          enableHighAccuracy: false,
-          timeout: 10000,
-          maximumAge: 300000,
         }
-      );
+      } catch (error) {
+        console.error("Error getting location:", error);
+        let errorMessage = "";
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage =
+              "Location access denied. You can still search manually.";
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage =
+              "Location unavailable. Please enter address manually.";
+            break;
+          case error.TIMEOUT:
+            errorMessage =
+              "Location request timed out. Please enter address manually.";
+            break;
+          default:
+            errorMessage =
+              "Unable to get location. Please enter address manually.";
+        }
+        setLocationError(errorMessage);
+        setLocationLoading(false);
+      }
     };
 
     getCurrentLocation();
-  }, []);
+  }, [getBestCurrentLocation]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -458,42 +503,40 @@ export default function Landing() {
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        setCurrentCoords({ lat: latitude, lon: longitude });
+    try {
+      const position = await getBestCurrentLocation();
+      const { latitude, longitude, accuracy } = position.coords;
+      setCurrentCoords({ lat: latitude, lon: longitude });
 
-        const nearestPlace = await findNearestPlace(latitude, longitude);
-        setPickupLocation(nearestPlace);
-        setLocationLoading(false);
+      const nearestPlace = await findNearestPlace(latitude, longitude);
+      setPickupLocation(nearestPlace);
+      setLocationLoading(false);
+
+      if (accuracy > 120) {
+        setLocationError('Low GPS accuracy detected. Move near an open area and tap again for better precision.');
+      } else {
         setLocationError(null);
-      },
-      (error) => {
-        console.error("Error getting location:", error);
-        let errorMessage = "";
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            errorMessage =
-              "Location access denied. Please enable permissions and try again.";
-            break;
-          case error.POSITION_UNAVAILABLE:
-            errorMessage = "Location unavailable. Please enter address manually.";
-            break;
-          case error.TIMEOUT:
-            errorMessage = "Location request timed out. Please try again.";
-            break;
-          default:
-            errorMessage = "Unable to get location. Please enter address manually.";
-        }
-        setLocationError(errorMessage);
-        setLocationLoading(false);
-      },
-      {
-        enableHighAccuracy: false,
-        timeout: 10000,
-        maximumAge: 300000,
       }
-    );
+    } catch (error) {
+      console.error("Error getting location:", error);
+      let errorMessage = "";
+      switch (error.code) {
+        case error.PERMISSION_DENIED:
+          errorMessage =
+            "Location access denied. Please enable permissions and try again.";
+          break;
+        case error.POSITION_UNAVAILABLE:
+          errorMessage = "Location unavailable. Please enter address manually.";
+          break;
+        case error.TIMEOUT:
+          errorMessage = "Location request timed out. Please try again.";
+          break;
+        default:
+          errorMessage = "Unable to get location. Please enter address manually.";
+      }
+      setLocationError(errorMessage);
+      setLocationLoading(false);
+    }
   };
 
   return (

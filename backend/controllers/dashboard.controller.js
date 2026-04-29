@@ -1,5 +1,8 @@
 const pool = require('../db/Connect_to_sql');
-const { emitRideAccepted } = require('../config/socket');
+const { emitRideAccepted, emitPaymentRequired, emitPaymentStatusUpdate } = require('../config/socket');
+const { createCheckoutSessionForRide } = require('./payments.controller');
+
+const isNonCashMethod = (method) => ['upi', 'card', 'wallet'].includes(String(method || '').toLowerCase());
 
 // Get rider dashboard statistics
 exports.getRiderStats = async (req, res) => {
@@ -75,7 +78,9 @@ exports.getPendingRequests = async (req, res) => {
         r.fare,
         r.ride_type,
         r.vehicle_type,
+        r.status,
         r.payment_method,
+        r.payment_status,
         r.requested_at,
         u.full_name as passenger_name,
         u.email as passenger_email,
@@ -83,11 +88,12 @@ exports.getPendingRequests = async (req, res) => {
       FROM rides r
       JOIN users u ON r.passenger_id = u.id
       WHERE r.status = 'pending'
+         OR (r.status = 'accepted' AND r.rider_id = $1)
       ORDER BY r.requested_at DESC
       LIMIT 20
     `;
 
-    const result = await pool.query(query);
+    const result = await pool.query(query, [riderId]);
 
     const requests = result.rows.map(row => ({
       id: row.id,
@@ -99,7 +105,9 @@ exports.getPendingRequests = async (req, res) => {
       fare: `₹${parseFloat(row.fare).toFixed(0)}`,
       rideType: row.ride_type,
       vehicleType: row.vehicle_type,
+      status: row.status,
       paymentMethod: row.payment_method || 'cash',
+      paymentStatus: row.payment_status || (row.payment_method === 'cash' ? 'completed' : 'pending'),
       time: row.minutes_ago < 1 ? 'Just now' : 
             row.minutes_ago < 60 ? `${Math.floor(row.minutes_ago)} mins ago` : 
             `${Math.floor(row.minutes_ago / 60)} hours ago`,
@@ -250,7 +258,7 @@ exports.acceptRide = async (req, res) => {
 
     // Check if ride exists and is pending
     const checkQuery = `
-      SELECT id, status, passenger_id
+      SELECT id, status, passenger_id, payment_method, payment_status, fare, pickup_location, destination
       FROM rides
       WHERE id = $1
     `;
@@ -297,10 +305,10 @@ exports.acceptRide = async (req, res) => {
       [riderId]
     );
     const riderInfo = riderInfoResult.rows[0] || {};
+    const acceptedRide = checkResult.rows[0];
 
-    // Emit ride-accepted to the passenger via Socket.IO
     const passengerId = checkResult.rows[0].passenger_id;
-    emitRideAccepted(passengerId, {
+    const riderPayload = {
       rideId,
       riderId,
       riderName: `${riderInfo.first_name || ''} ${riderInfo.last_name || ''}`.trim(),
@@ -309,6 +317,70 @@ exports.acceptRide = async (req, res) => {
       vehicleModel: riderInfo.vehicle_model || '',
       vehiclePlate: riderInfo.vehicle_plate || '',
       riderLocation: riderInfo.current_location || null,
+    };
+
+    if (isNonCashMethod(acceptedRide.payment_method)) {
+      const rideForPayment = {
+        id: Number(rideId),
+        passenger_id: passengerId,
+        rider_id: riderId,
+        fare: acceptedRide.fare,
+        pickup_location: acceptedRide.pickup_location,
+        destination: acceptedRide.destination,
+        payment_method: acceptedRide.payment_method,
+      };
+
+      let session;
+      try {
+        session = await createCheckoutSessionForRide(rideForPayment);
+      } catch (paymentError) {
+        await pool.query(
+          `UPDATE rides
+           SET rider_id = NULL,
+               status = 'pending',
+               accepted_at = NULL,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $1`,
+          [rideId]
+        );
+        throw paymentError;
+      }
+
+      emitPaymentRequired(passengerId, {
+        ...riderPayload,
+        checkoutUrl: session.url,
+        sessionId: session.id,
+        paymentStatus: 'pending',
+      });
+
+      emitPaymentStatusUpdate({
+        rideId: Number(rideId),
+        passengerId,
+        riderId,
+        paymentStatus: 'pending',
+        message: 'Passenger payment is in progress',
+      });
+
+      return res.json({
+        success: true,
+        paymentRequired: true,
+        message: 'Ride accepted. Waiting for passenger payment.',
+        ride: updateResult.rows[0],
+      });
+    }
+
+    // Cash rides proceed immediately after acceptance.
+    emitRideAccepted(passengerId, {
+      ...riderPayload,
+      paymentStatus: 'completed',
+    });
+
+    emitPaymentStatusUpdate({
+      rideId: Number(rideId),
+      passengerId,
+      riderId,
+      paymentStatus: 'completed',
+      message: 'Cash ride confirmed',
     });
 
     res.json({
@@ -319,7 +391,7 @@ exports.acceptRide = async (req, res) => {
 
   } catch (error) {
     console.error('Error accepting ride:', error);
-    res.status(500).json({ error: 'Failed to accept ride' });
+    res.status(500).json({ error: error.message || 'Failed to accept ride' });
   }
 };
 

@@ -93,6 +93,14 @@ export const riderAPI = {
       body: JSON.stringify({ status })
     });
     return handleResponse(response);
+  },
+
+  // Get payment state for accepted rides as rider
+  getRidePaymentStatus: async (rideId) => {
+    const response = await fetch(`${API_BASE_URL}/payments/rider/status/${rideId}`, {
+      headers: getAuthHeaders(true)
+    });
+    return handleResponse(response);
   }
 };
 
@@ -134,6 +142,22 @@ export const ridesAPI = {
 
 // Payments APIs
 export const paymentsAPI = {
+  createCheckoutSession: async (rideId) => {
+    const response = await fetch(`${API_BASE_URL}/payments/checkout-session`, {
+      method: 'POST',
+      headers: getAuthHeaders(false),
+      body: JSON.stringify({ rideId })
+    });
+    return handleResponse(response);
+  },
+
+  getPaymentStatus: async (rideId) => {
+    const response = await fetch(`${API_BASE_URL}/payments/status/${rideId}`, {
+      headers: getAuthHeaders(false)
+    });
+    return handleResponse(response);
+  },
+
   cancelPendingPayment: async (rideId) => {
     const response = await fetch(`${API_BASE_URL}/payments/ride/${rideId}/cancel`, {
       method: 'POST',
@@ -167,6 +191,6 @@ export const userAPI = {
 export default {
   riderAPI,
   ridesAPI,
-  paymentsAPI,
-  userAPI
+  userAPI,
+  paymentsAPI
 };

@@ -1,135 +1,150 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { CheckCircle, Loader, Car, ArrowRight } from 'lucide-react';
+import { CheckCircle, Loader, MapPin } from 'lucide-react';
 import Header from '../../components/common/Header';
-import { ridesAPI } from '../../services/api';
+import { paymentsAPI } from '../../services/api';
 
 export default function PaymentSuccess() {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const [isChecking, setIsChecking] = useState(true);
+  const [statusText, setStatusText] = useState('Confirming your payment...');
+  const [rideData, setRideData] = useState(null);
 
-  const rideIdFromQuery = searchParams.get('rideId');
-  const pendingRaw = sessionStorage.getItem('pendingRidePayment');
-  const pending = useMemo(() => {
+  const rideId = searchParams.get('rideId');
+
+  const pendingRidePayment = useMemo(() => {
     try {
-      return pendingRaw ? JSON.parse(pendingRaw) : null;
+      const raw = sessionStorage.getItem('pendingRidePayment');
+      return raw ? JSON.parse(raw) : null;
     } catch {
       return null;
     }
-  }, [pendingRaw]);
-
-  const rideId = rideIdFromQuery || pending?.rideId;
-  const [isChecking, setIsChecking] = useState(false);
-  const [statusText, setStatusText] = useState('Payment successful. Waiting for rider acceptance...');
-
-  const checkStatus = async () => {
-    if (!rideId) return;
-    setIsChecking(true);
-    try {
-      const result = await ridesAPI.getRideDetails(rideId);
-      const ride = result?.ride;
-
-      if (!ride) {
-        setStatusText('Ride not found yet. Please refresh in a moment.');
-        return;
-      }
-
-      if (ride.status === 'accepted' || ride.status === 'in-progress') {
-        sessionStorage.removeItem('pendingRidePayment');
-        navigate('/tracking', {
-          state: {
-            rideId,
-            role: 'passenger',
-            riderName: ride.rider_name || '',
-            riderPhone: ride.rider_phone || '',
-            vehicleType: ride.vehicle_type || '',
-            vehiclePlate: ride.vehicle_number || '',
-            pickup: pending?.pickup || '',
-            destination: pending?.destination || '',
-            pickupCoords: pending?.pickupCoords || null,
-            destCoords: pending?.destCoords || null,
-          }
-        });
-        return;
-      }
-
-      setStatusText(`Ride status: ${ride.status}. Riders are being notified.`);
-    } catch {
-      setStatusText('Could not fetch ride status right now. Please try again.');
-    } finally {
-      setIsChecking(false);
-    }
-  };
+  }, []);
 
   useEffect(() => {
-    if (!rideId) return;
-    const timer = setInterval(checkStatus, 5000);
-    return () => clearInterval(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rideId]);
+    let mounted = true;
 
-  if (!rideId) {
-    return (
-      <div className="min-h-screen bg-slate-50">
-        <Header />
-        <main className="max-w-xl mx-auto px-4 pt-28 pb-8">
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 text-center">
-            <p className="text-slate-700 font-semibold">Payment completed, but ride details were not found.</p>
-            <button
-              onClick={() => navigate('/ride-search')}
-              className="mt-4 px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold"
-            >
-              Back to Ride Search
-            </button>
-          </div>
-        </main>
-      </div>
-    );
-  }
+    const checkStatus = async () => {
+      const resolvedRideId = Number(rideId || pendingRidePayment?.rideId);
+      if (!resolvedRideId) {
+        setStatusText('Missing ride information.');
+        setIsChecking(false);
+        return;
+      }
+
+      try {
+        const result = await paymentsAPI.getPaymentStatus(resolvedRideId);
+        if (!mounted) return;
+
+        const ride = result?.ride;
+        setRideData(ride);
+
+        if (ride?.payment_status === 'completed' && (ride?.status === 'accepted' || ride?.status === 'in-progress')) {
+          setStatusText('Payment confirmed. Redirecting to live tracking...');
+          sessionStorage.removeItem('pendingRidePayment');
+          setTimeout(() => {
+            navigate('/tracking', {
+              state: {
+                rideId: resolvedRideId,
+                role: 'passenger',
+                riderName: ride?.rider_name || pendingRidePayment?.riderName || '',
+                riderPhone: ride?.rider_phone || pendingRidePayment?.riderPhone || '',
+                vehicleType: ride?.vehicle_type || pendingRidePayment?.vehicleType || '',
+                vehiclePlate: ride?.vehicle_number || pendingRidePayment?.vehiclePlate || '',
+                pickup: pendingRidePayment?.pickup || '',
+                destination: pendingRidePayment?.destination || '',
+                pickupCoords: pendingRidePayment?.pickupCoords || null,
+                destCoords: pendingRidePayment?.destCoords || null,
+              },
+            });
+          }, 1200);
+          return;
+        }
+
+        if (ride?.payment_status === 'completed') {
+          setStatusText('Payment confirmed. Waiting for ride status update...');
+        } else {
+          setStatusText('Payment received. Finalizing confirmation...');
+        }
+      } catch {
+        if (!mounted) return;
+        setStatusText('Could not confirm payment right now. Retrying...');
+      } finally {
+        if (mounted) setIsChecking(false);
+      }
+    };
+
+    checkStatus();
+    const interval = setInterval(checkStatus, 4000);
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, [navigate, pendingRidePayment, rideId]);
+
+  const goToTrackingNow = () => {
+    const resolvedRideId = Number(rideId || pendingRidePayment?.rideId);
+    if (!resolvedRideId || !rideData) return;
+
+    navigate('/tracking', {
+      state: {
+        rideId: resolvedRideId,
+        role: 'passenger',
+        riderName: rideData?.rider_name || pendingRidePayment?.riderName || '',
+        riderPhone: rideData?.rider_phone || pendingRidePayment?.riderPhone || '',
+        vehicleType: rideData?.vehicle_type || pendingRidePayment?.vehicleType || '',
+        vehiclePlate: rideData?.vehicle_number || pendingRidePayment?.vehiclePlate || '',
+        pickup: pendingRidePayment?.pickup || '',
+        destination: pendingRidePayment?.destination || '',
+        pickupCoords: pendingRidePayment?.pickupCoords || null,
+        destCoords: pendingRidePayment?.destCoords || null,
+      },
+    });
+  };
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-emerald-50">
       <Header />
-      <main className="max-w-xl mx-auto px-4 pt-28 pb-8">
-        <div className="bg-white rounded-2xl border border-slate-200 p-6">
+      <main className="max-w-2xl mx-auto px-4 pt-28 pb-12">
+        <div className="rounded-3xl border border-emerald-200 bg-white shadow-xl p-8">
           <div className="flex items-center gap-3 mb-4">
-            <CheckCircle className="w-8 h-8 text-emerald-500" />
-            <div>
-              <h1 className="text-xl font-bold text-slate-900">Payment Successful</h1>
-              <p className="text-sm text-slate-500">Ride #{rideId}</p>
+            <CheckCircle className="w-8 h-8 text-emerald-600" />
+            <h1 className="text-2xl font-bold text-slate-900">Payment Successful</h1>
+          </div>
+
+          <p className="text-slate-600 mb-6">{statusText}</p>
+
+          <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-4 mb-6">
+            <div className="flex items-center gap-2 text-emerald-700 text-sm font-semibold">
+              <MapPin className="w-4 h-4" />
+              Ride ID: #{rideId || pendingRidePayment?.rideId || 'N/A'}
             </div>
           </div>
 
-          <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-4">
-            <p className="text-sm font-semibold text-emerald-700">{statusText}</p>
-          </div>
-
-          {pending && (
-            <div className="mt-4 space-y-2 text-sm text-slate-700">
-              <p><span className="font-semibold">Vehicle:</span> {pending.vehicleName}</p>
-              <p><span className="font-semibold">Fare:</span> ₹{Number(pending.fare || 0).toFixed(0)}</p>
-              <p><span className="font-semibold">Payment:</span> {(pending.paymentMethod || 'card').toUpperCase()}</p>
-            </div>
-          )}
-
-          <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="flex gap-3">
             <button
-              onClick={checkStatus}
-              disabled={isChecking}
-              className="px-4 py-3 rounded-xl bg-blue-600 text-white font-semibold disabled:opacity-60 flex items-center justify-center gap-2"
+              onClick={goToTrackingNow}
+              disabled={!rideData || rideData.payment_status !== 'completed'}
+              className="flex-1 py-3 rounded-xl font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50"
             >
-              {isChecking ? <Loader className="w-4 h-4 animate-spin" /> : <Car className="w-4 h-4" />}
-              Check Ride Status
+              Go to Live Tracking
             </button>
-
             <button
               onClick={() => navigate('/ride-search')}
-              className="px-4 py-3 rounded-xl border border-slate-300 text-slate-700 font-semibold flex items-center justify-center gap-2"
+              className="px-4 py-3 rounded-xl border border-slate-300 font-semibold text-slate-700 hover:bg-slate-50"
             >
-              New Ride
-              <ArrowRight className="w-4 h-4" />
+              Back
             </button>
           </div>
+
+          {isChecking && (
+            <div className="mt-4 flex items-center gap-2 text-sm text-slate-500">
+              <Loader className="w-4 h-4 animate-spin" />
+              Checking payment and ride status...
+            </div>
+          )}
         </div>
       </main>
     </div>
