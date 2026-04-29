@@ -364,6 +364,7 @@ export default function RideSearch() {
   const [destCoords, setDestCoords] = useState(null);
   const [booked, setBooked] = useState(null);
   const [selectedRiderId, setSelectedRiderId] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState('cash');
 
   const searchedDistance = parseFloat(searchSnapshot?.distance || searchResults?.distance || 0);
 
@@ -405,11 +406,21 @@ export default function RideSearch() {
     });
 
     socket.on("connect", () => {
-      console.log("✅ Passenger socket connected, waiting for ride acceptance…");
+      console.log("✅ Passenger socket connected, socket ID:", socket.id);
+      console.log("📤 Emitting passenger-join with userId:", userId);
       if (userId) socket.emit("passenger-join", userId);
+      else console.warn("⚠️ No userId found, passenger-join not emitted!");
     });
 
-    // Real-time path: rider accepts → backend emits ride-accepted → navigate
+    socket.on('connect_error', (error) => {
+      console.error("❌ Socket connection error:", error);
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.log("🔌 Socket disconnected:", reason);
+    });
+
+    // Rider accepted and payment is completed (cash or successful online payment)
     socket.on("ride-accepted", (data) => {
       console.log("🚗 Ride accepted (socket):", data);
       socket.disconnect();
@@ -422,13 +433,92 @@ export default function RideSearch() {
       );
     });
 
-    // Fallback polling: check DB every 5 s in case socket event was missed
+    // Rider accepted online-payment ride: redirect passenger to payment tab.
+    socket.on("ride-payment-required", (data) => {
+      console.log("💳 ride-payment-required event received:", data);
+      if ((data.rideId || booked.rideId) !== booked.rideId) {
+        console.warn("Ride ID mismatch, ignoring event");
+        return;
+      }
+
+      const pendingPaymentPayload = {
+        rideId: data.rideId || booked.rideId,
+        riderId: data.riderId,
+        riderName: data.riderName,
+        riderPhone: data.riderPhone,
+        vehicleType: data.vehicleType,
+        vehiclePlate: data.vehiclePlate,
+        paymentMethod,
+        fare: booked?.fare,
+        pickup: booked?.pickup || pickup,
+        destination: booked?.destination || destination,
+        pickupCoords: booked?.pickupCoords || pickupCoords,
+        destCoords: booked?.destCoords || destCoords,
+        checkoutUrl: data.checkoutUrl,
+        createdAt: Date.now(),
+      };
+
+      sessionStorage.setItem('pendingRidePayment', JSON.stringify(pendingPaymentPayload));
+
+      if (didNavigate) {
+        console.warn("Already navigated, ignoring duplicate event");
+        return;
+      }
+      didNavigate = true;
+      socket.disconnect();
+      
+      console.log("🔄 Redirecting to payment page...");
+      // Redirect to payment tab
+      navigate("/payment", {
+        state: { paymentData: pendingPaymentPayload },
+      });
+    });
+
+    socket.on('ride-payment-status', (data) => {
+      if ((data.rideId || booked.rideId) !== booked.rideId) return;
+      setBooked((prev) => prev ? { ...prev, paymentStatus: data.paymentStatus || prev.paymentStatus } : prev);
+    });
+
+    // Fallback polling: check DB every 3s in case socket event was missed
     const pollInterval = setInterval(async () => {
       if (didNavigate) { clearInterval(pollInterval); return; }
       try {
         const result = await ridesAPI.getRideDetails(booked.rideId);
         const ride = result?.ride;
-        if (ride && (ride.status === "accepted" || ride.status === "in-progress")) {
+        
+        if (ride && ride.status === "accepted" && ride.payment_status === "pending" && paymentMethod !== 'cash') {
+          // Non-cash ride accepted and waiting for payment - redirect to payment tab
+          console.log("📋 Poll detected accepted non-cash ride, redirecting to payment...");
+          clearInterval(pollInterval);
+          if (didNavigate) return;
+          didNavigate = true;
+          socket.disconnect();
+          
+          const pendingPaymentPayload = {
+            rideId: booked.rideId,
+            riderId: ride.rider_id,
+            riderName: ride.rider_name || "",
+            riderPhone: ride.rider_phone || "",
+            vehicleType: ride.vehicle_type || paymentMethod,
+            vehiclePlate: ride.vehicle_number || "",
+            paymentMethod,
+            fare: booked?.fare,
+            pickup: booked?.pickup || pickup,
+            destination: booked?.destination || destination,
+            pickupCoords: booked?.pickupCoords || pickupCoords,
+            destCoords: booked?.destCoords || destCoords,
+            createdAt: Date.now(),
+          };
+
+          sessionStorage.setItem('pendingRidePayment', JSON.stringify(pendingPaymentPayload));
+          navigate("/payment", {
+            state: { paymentData: pendingPaymentPayload },
+          });
+          return;
+        }
+        
+        if (ride && (ride.status === "accepted" || ride.status === "in-progress") && ride.payment_status === 'completed') {
+          // Cash ride accepted, proceed to tracking
           clearInterval(pollInterval);
           socket.disconnect();
           goToTracking(
@@ -442,7 +532,7 @@ export default function RideSearch() {
       } catch (e) {
         console.warn("Ride status poll failed:", e.message);
       }
-    }, 5000);
+    }, 3000);
 
     return () => {
       clearInterval(pollInterval);
@@ -537,7 +627,7 @@ export default function RideSearch() {
         setLocationError(msg);
         setLocationLoading(false);
       },
-      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
   }, [resolveAddress]);
 
@@ -769,6 +859,7 @@ export default function RideSearch() {
         fare: selectedFare.toFixed(2),
         rideType: searchSnapshot.rideType,
         vehicleType: selectedVehicle,
+        paymentMethod,
         pickupCoordinates: searchSnapshot.pickupCoords,
         selectedRiderId: selectedRiderId || undefined,
       });
@@ -783,6 +874,8 @@ export default function RideSearch() {
           vehicleName: selectedVehicleObj.name,
           nearbyRiders: result.nearbyRiders,
           chosenRiderName: chosenRider?.name || null,
+          paymentMethod,
+          paymentStatus: result.paymentStatus || (paymentMethod === 'cash' ? 'completed' : 'pending'),
           pickup: searchSnapshot.pickup,
           destination: searchSnapshot.destination,
           pickupCoords: searchSnapshot.pickupCoords,
@@ -813,7 +906,34 @@ export default function RideSearch() {
     try {
       const result = await ridesAPI.getRideDetails(booked.rideId);
       const ride = result?.ride;
-      if (ride && (ride.status === "accepted" || ride.status === "in-progress")) {
+      
+      // Non-cash ride accepted and waiting for payment
+      if (ride && ride.status === "accepted" && ride.payment_status === 'pending' && paymentMethod !== 'cash') {
+        console.log("💳 Detected pending payment for accepted ride, redirecting to payment...");
+        const pendingPaymentPayload = {
+          rideId: booked.rideId,
+          riderId: ride.rider_id,
+          riderName: ride.rider_name || "",
+          riderPhone: ride.rider_phone || "",
+          vehicleType: ride.vehicle_type || "",
+          vehiclePlate: ride.vehicle_number || "",
+          paymentMethod,
+          fare: booked?.fare,
+          pickup: booked?.pickup || pickup,
+          destination: booked?.destination || destination,
+          pickupCoords: booked?.pickupCoords || pickupCoords,
+          destCoords: booked?.destCoords || destCoords,
+          createdAt: Date.now(),
+        };
+        sessionStorage.setItem('pendingRidePayment', JSON.stringify(pendingPaymentPayload));
+        navigate("/payment", {
+          state: { paymentData: pendingPaymentPayload },
+        });
+        return;
+      }
+      
+      // Cash ride completed or in-progress
+      if (ride && (ride.status === "accepted" || ride.status === "in-progress") && ride.payment_status === 'completed') {
         navigate("/tracking", {
           state: {
             rideId:       booked.rideId,
@@ -829,10 +949,11 @@ export default function RideSearch() {
           },
         });
       } else {
-        alert(`Ride status: ${ride?.status || "unknown"} — still waiting for a rider.`);
+        alert(`Ride status: ${ride?.status || "unknown"} | payment: ${ride?.payment_status || 'pending'} — waiting for rider/payment confirmation.`);
       }
-    } catch {
+    } catch (error) {
       alert("Could not check ride status. Please try again.");
+      console.error("Check status error:", error);
     } finally {
       setIsLoading(false);
     }
@@ -852,13 +973,14 @@ export default function RideSearch() {
               </div>
               <h2 className="text-2xl font-extrabold text-white">Ride Requested!</h2>
               <p className="text-white/70 mt-1 text-sm">
-                Your request has been sent to nearby riders
+                Waiting for rider acceptance
               </p>
             </div>
             <div className="px-8 py-6 space-y-4">
               <Detail label="Ride ID"        value={`#${booked.rideId}`} />
               <Detail label="Vehicle"         value={booked.vehicleName} />
               <Detail label="Fare"            value={`₹${booked.fare.toFixed(0)}`} highlight />
+              <Detail label="Payment"         value={booked.paymentMethod?.toUpperCase() || 'CASH'} />
               {booked.chosenRiderName
                 ? <Detail label="Requested Rider" value={booked.chosenRiderName} />
                 : <Detail label="Riders notified" value={`${booked.nearbyRiders} rider(s)`} />
@@ -869,7 +991,11 @@ export default function RideSearch() {
                 <Loader className="w-5 h-5 text-blue-600 shrink-0 animate-spin" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-blue-800">Waiting for a rider to accept…</p>
-                  <p className="text-xs text-blue-500 mt-0.5">You'll be taken to the live map automatically.</p>
+                  <p className="text-xs text-blue-500 mt-0.5">
+                    {booked.paymentMethod === 'cash'
+                      ? "You'll be taken to the live map automatically."
+                      : "You will be redirected to payment as soon as a rider accepts."}
+                  </p>
                 </div>
                 <button
                   onClick={handleCheckStatus}
@@ -1267,6 +1393,33 @@ export default function RideSearch() {
                       <span>⚠️</span> No riders are online right now. You can still book — a rider will be notified when they come online.
                     </div>
                   )}
+
+                <div className="px-6 pb-2">
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
+                    Payment Method
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[
+                      { id: 'cash', label: 'Cash' },
+                      { id: 'card', label: 'Card' },
+                      { id: 'upi', label: 'UPI' },
+                      { id: 'wallet', label: 'Wallet' },
+                    ].map((method) => (
+                      <button
+                        key={method.id}
+                        type="button"
+                        onClick={() => setPaymentMethod(method.id)}
+                        className={`py-2.5 rounded-xl border text-sm font-semibold transition ${
+                          paymentMethod === method.id
+                            ? 'border-transparent bg-linear-to-r from-blue-600 via-purple-600 to-purple-700 text-white shadow'
+                            : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300'
+                        }`}
+                      >
+                        {method.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
                 <div className="px-6 pb-6">
                   <button

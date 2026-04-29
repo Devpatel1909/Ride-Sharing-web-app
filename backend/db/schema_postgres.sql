@@ -17,6 +17,12 @@ CREATE TABLE IF NOT EXISTS rides (
   fare DECIMAL(10,2) NOT NULL,
   ride_type ride_type NOT NULL,
   vehicle_type VARCHAR(50) NOT NULL,
+  payment_method VARCHAR(20) DEFAULT 'cash',
+  payment_status VARCHAR(20) DEFAULT 'completed',
+  stripe_session_id VARCHAR(255),
+  stripe_payment_intent_id VARCHAR(255),
+  payment_completed_at TIMESTAMP,
+  payment_failed_reason TEXT,
   status ride_status DEFAULT 'pending',
   requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   accepted_at TIMESTAMP,
@@ -31,6 +37,8 @@ CREATE INDEX IF NOT EXISTS idx_rides_status ON rides(status);
 CREATE INDEX IF NOT EXISTS idx_rides_rider ON rides(rider_id);
 CREATE INDEX IF NOT EXISTS idx_rides_passenger ON rides(passenger_id);
 CREATE INDEX IF NOT EXISTS idx_rides_requested_at ON rides(requested_at);
+CREATE INDEX IF NOT EXISTS idx_rides_payment_status ON rides(payment_status);
+CREATE INDEX IF NOT EXISTS idx_rides_stripe_session ON rides(stripe_session_id);
 
 -- Add columns to riders table for availability and location tracking
 ALTER TABLE riders 
@@ -73,7 +81,9 @@ CREATE INDEX IF NOT EXISTS idx_notifications_rider_unread ON notifications(rider
 CREATE OR REPLACE FUNCTION update_rider_stats_on_complete()
 RETURNS TRIGGER AS $$
 BEGIN
-  IF NEW.status = 'completed' AND OLD.status != 'completed' THEN
+  IF NEW.status = 'completed'
+     AND OLD.status != 'completed'
+     AND (NEW.payment_method = 'cash' OR NEW.payment_status = 'completed') THEN
     UPDATE riders 
     SET 
       total_rides = total_rides + 1,
