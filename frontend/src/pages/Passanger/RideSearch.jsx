@@ -970,6 +970,14 @@ export default function RideSearch() {
               go?
             </span>
           </h1>
+          <div className="flex gap-3 justify-center mt-4">
+            <Link
+              to="/shared-ride-search"
+              className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full font-semibold text-sm hover:shadow-lg hover:shadow-amber-500/30 transition-all hover:opacity-90"
+            >
+              🚗 Find Shared Rides
+            </Link>
+          </div>
         </div>
 
         <Stepper step={step} />

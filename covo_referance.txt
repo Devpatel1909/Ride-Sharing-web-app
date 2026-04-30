@@ -1,0 +1,113 @@
+prompt - now use poject_state md for fererance and make a plan to impleament shared ride moule meaning multiple peaasngers from different account can ride on single ride
+
+reply - 
+The user wants me to create a plan to implement a shared ride module where multiple passengers from different accounts can ride on a single ride. This is a significant feature that requires changes to the database schema, backend logic, and frontend UI.
+
+Let me think about what needs to be changed:
+
+Database Schema Changes:
+
+Need a way to link multiple passengers to a single ride
+Could use a junction table (ride_passengers) or modify the rides table
+Need to track pickup/dropoff for each passenger
+Need to track fare split for each passenger
+Need to track passenger status (waiting, picked up, dropped off)
+Backend Changes:
+
+Modify ride booking to support multiple passengers
+Add logic to match passengers for shared rides
+Update ride status tracking for individual passengers
+Modify fare calculation for shared rides
+Update Socket.IO events for multi-passenger notifications
+Add API endpoints for joining shared rides
+Frontend Changes:
+
+Update ride booking UI to show shared ride options
+Add UI for passengers to join existing shared rides
+Update tracking page to show multiple passengers
+Add passenger status indicators
+Update rider dashboard to show all passengers on a ride
+Let me create a comprehensive plan using the EnterPlanMode tool.
+
+I'll create a comprehensive plan for implementing the shared ride module where multiple passengers can ride together.
+
+EnterPlanMode
+OUT
+Entered plan mode. You should now focus on exploring the codebase and designing an implementation approach.
+
+In plan mode, you should:
+1. Thoroughly explore the codebase to understand existing patterns
+2. Identify similar features and architectural approaches
+3. Consider multiple approaches and their trade-offs
+4. Use AskUserQuestion if you need to clarify the approach
+5. Design a concrete implementation strategy
+6. When ready, use ExitPlanMode to present your plan for approval
+
+Remember: DO NOT write or edit any files yet. This is a read-only exploration and planning phase.
+I'm now in plan mode. I need to explore the codebase to understand the existing implementation and then create a comprehensive plan for implementing shared rides where multiple passengers can ride together.
+
+Let me start by exploring the codebase to understand:
+
+Current ride booking flow
+Database schema for rides
+How passengers are currently linked to rides
+Socket.IO events for ride notifications
+Frontend components for ride booking and tracking
+I'll launch explore agents to understand these areas.
+
+I'll explore the codebase to understand the current implementation before designing the shared ride module.
+
+Agent:Explore ride booking flow
+IN
+Explore the ride booking implementation in this codebase. I need to understand:
+
+1. How rides are currently created and stored in the database (look at rides.controller.js, rides table schema)
+2. How passengers are linked to rides (is it one-to-one or can it support multiple?)
+3. The ride status flow (pending → accepted → in-progress → completed)
+4. How fare is calculated and stored
+5. Any existing shared ride logic (ride_type field, etc.)
+
+Focus on:
+- backend/controllers/rides.controller.js
+- backend/models/ (any ride-related models)
+- backend/routes/rides.routes.js
+- backend/db/ (any migration files showing rides table schema)
+- backend/migrations/ (any schema files)
+
+Return a summary of the current ride data model and booking flow, including any existing support for multiple passengers.
+Agent:Explore Socket.IO ride events
+IN
+Explore the Socket.IO implementation for ride notifications and tracking. I need to understand:
+
+1. What Socket.IO events are currently used for ride notifications
+2. How ride acceptance is communicated between rider and passenger
+3. How location updates are handled during rides
+4. What rooms/channels are used for ride communication
+5. Any existing multi-party communication patterns
+
+Focus on:
+- backend/config/socket.js
+- backend/services/ride-notification.service.js
+- frontend/src/pages/Passanger/RideSearch.jsx (socket usage)
+- frontend/src/pages/Rider/RiderDashboard.jsx (socket usage)
+- frontend/src/pages/TrackingMap.jsx (if it exists)
+
+Return a summary of the current Socket.IO event architecture and how it could be extended for multiple passengers.
+Agent:Explore frontend ride components
+IN
+Explore the frontend components related to ride booking and tracking. I need to understand:
+
+1. How passengers currently book rides (UI flow, form fields)
+2. How ride_type (personal vs shared) is currently used
+3. How ride tracking is displayed to passengers
+4. How riders see ride requests and accept them
+5. Any existing UI elements that could be reused for showing multiple passengers
+
+Focus on:
+- frontend/src/pages/Passanger/RideSearch.jsx
+- frontend/src/pages/Rider/RiderDashboard.jsx
+- frontend/src/pages/Rider/RideRequests.jsx
+- frontend/src/pages/TrackingMap.jsx
+- frontend/src/services/api.js (ride-related API calls)
+
+Return a summary of the current UI flow and identify components that would need modification for shared rides.

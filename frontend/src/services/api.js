@@ -129,6 +129,45 @@ export const ridesAPI = {
       headers: getAuthHeaders(false)
     });
     return handleResponse(response);
+  },
+
+  // Shared Ride APIs
+  // Get available shared rides
+  getSharedAvailableRides: async (vehicleType = 'car') => {
+    const response = await fetch(`${API_BASE_URL}/rides/shared-available`, {
+      method: 'POST',
+      headers: getAuthHeaders(false),
+      body: JSON.stringify({ vehicleType })
+    });
+    return handleResponse(response);
+  },
+
+  // Join a shared ride
+  joinSharedRide: async (rideId, rideData) => {
+    const response = await fetch(`${API_BASE_URL}/rides/join-shared/${rideId}`, {
+      method: 'POST',
+      headers: getAuthHeaders(false),
+      body: JSON.stringify(rideData)
+    });
+    return handleResponse(response);
+  },
+
+  // Get all passengers in a ride
+  getRidePassengers: async (rideId) => {
+    const response = await fetch(`${API_BASE_URL}/rides/${rideId}/passengers`, {
+      headers: getAuthHeaders(false)
+    });
+    return handleResponse(response);
+  },
+
+  // Update passenger status (rider only)
+  updatePassengerStatus: async (rideId, passengerId, status) => {
+    const response = await fetch(`${API_BASE_URL}/rides/${rideId}/passengers/${passengerId}/status`, {
+      method: 'PUT',
+      headers: getAuthHeaders(true),
+      body: JSON.stringify({ status })
+    });
+    return handleResponse(response);
   }
 };
 

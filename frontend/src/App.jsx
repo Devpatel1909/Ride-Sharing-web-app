@@ -16,6 +16,9 @@ import ProtectedRoute from './components/ProtectedRoute'
 import MapPage from './pages/Map/MapPage'
 import Profile from './pages/Profile'
 import TrackingMap from './pages/TrackingMap'
+import SharedRideSearch from './pages/Passanger/SharedRideSearch'
+import SharedRidesDashboard from './pages/Rider/SharedRidesDashboard'
+import CreateSharedRide from './pages/Rider/CreateSharedRide'
 
 export default function App() {
   return (
@@ -31,6 +34,21 @@ export default function App() {
             <RiderDashboard />
           </ProtectedRoute>
         } />
+        <Route path="/rider-dashboard" element={
+          <ProtectedRoute>
+            <RiderDashboard />
+          </ProtectedRoute>
+        } />
+        <Route path="/rider-dashboard/ride/:rideId" element={
+          <ProtectedRoute>
+            <SharedRidesDashboard />
+          </ProtectedRoute>
+        } />
+        <Route path="/rider/create-shared-ride" element={
+          <ProtectedRoute>
+            <CreateSharedRide />
+          </ProtectedRoute>
+        } />
         <Route path="/rider/ride-requests" element={
           <ProtectedRoute>
             <RideRequests />
@@ -44,6 +62,11 @@ export default function App() {
         <Route path="/ride-search" element={
           <ProtectedRoute>
             <RideSearch />
+          </ProtectedRoute>
+        } />
+        <Route path="/shared-ride-search" element={
+          <ProtectedRoute>
+            <SharedRideSearch />
           </ProtectedRoute>
         } />
         <Route path="/payment/success" element={

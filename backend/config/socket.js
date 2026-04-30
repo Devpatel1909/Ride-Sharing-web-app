@@ -51,6 +51,19 @@ const initializeSocket = (server) => {
       io.to(`ride-${rideId}`).emit('ride-status-change', { rideId, status });
     });
 
+    // ── Shared Ride Events ──────────────────────────────────────────────────
+    // Passenger searches for shared rides
+    socket.on('search-shared-rides', (passengerId) => {
+      socket.join(`passenger-search-${passengerId}`);
+      console.log(`🔍 Passenger ${passengerId} is searching for shared rides`);
+    });
+
+    // Leave shared ride search
+    socket.on('leave-shared-search', (passengerId) => {
+      socket.leave(`passenger-search-${passengerId}`);
+      console.log(`👤 Passenger ${passengerId} stopped searching`);
+    });
+
     // Disconnect handler
     socket.on('disconnect', () => {
       console.log('❌ Client disconnected:', socket.id);
@@ -89,6 +102,74 @@ const emitRideStatusUpdate = (rideId, status, userId, riderId) => {
   }
 };
 
+// Emit new shared ride available to passengers searching
+const emitSharedRideAvailable = (rideData) => {
+  if (io) {
+    // Broadcast to all passengers searching for shared rides
+    io.emit('shared-ride-available', rideData);
+    console.log(`📢 New shared ride #${rideData.id} broadcast to all searching passengers`);
+  }
+};
+
+// Notify rider when passenger joins shared ride
+const emitPassengerJoinedSharedRide = (rideId, riderId, passengerData) => {
+  if (io) {
+    io.to(`ride-${rideId}`).emit('passenger-joined-shared-ride', {
+      rideId,
+      passenger: passengerData,
+      totalPassengers: passengerData.totalPassengers,
+      newFare: passengerData.fare,
+      timestamp: new Date()
+    });
+    console.log(`👥 Passenger ${passengerData.passengerId} joined shared ride #${rideId}`);
+  }
+};
+
+// Notify all passengers in ride when status updates
+const emitPassengerStatusUpdate = (rideId, passengerId, status, passengerName) => {
+  if (io) {
+    io.to(`ride-${rideId}`).emit('passenger-status-updated', {
+      rideId,
+      passengerId,
+      passengerName,
+      status,
+      timestamp: new Date()
+    });
+    console.log(`🔄 Passenger ${passengerId} status in ride #${rideId} updated to: ${status}`);
+  }
+};
+
+// Notify upcoming pickups in shared ride
+const emitPickupSequence = (rideId, passengers) => {
+  if (io) {
+    io.to(`ride-${rideId}`).emit('pickup-sequence', {
+      rideId,
+      passengers: passengers.map(p => ({
+        passengerId: p.passenger_id,
+        passengerName: p.full_name,
+        status: p.passenger_status,
+        pickupLocation: p.pickup_location,
+        pickupLat: p.pickup_lat,
+        pickupLng: p.pickup_lng
+      })),
+      timestamp: new Date()
+    });
+    console.log(`🗺️  Pickup sequence for ride #${rideId} updated`);
+  }
+};
+
+// Notify passengers about ride cancellation
+const emitSharedRideCancelled = (rideId, reason) => {
+  if (io) {
+    io.to(`ride-${rideId}`).emit('shared-ride-cancelled', {
+      rideId,
+      reason,
+      timestamp: new Date()
+    });
+    console.log(`❌ Shared ride #${rideId} cancelled: ${reason}`);
+  }
+};
+
 // Get socket instance
 const getIO = () => {
   if (!io) {
@@ -102,5 +183,10 @@ module.exports = {
   emitNewRideRequest,
   emitRideAccepted,
   emitRideStatusUpdate,
+  emitSharedRideAvailable,
+  emitPassengerJoinedSharedRide,
+  emitPassengerStatusUpdate,
+  emitPickupSequence,
+  emitSharedRideCancelled,
   getIO
 };

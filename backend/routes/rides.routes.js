@@ -9,6 +9,12 @@ router.post('/check-availability', ridesController.checkAvailability);
 router.post('/book', authenticateToken, ridesController.bookRide);
 router.get('/:rideId', ridesController.getRideDetails);
 
+// Shared ride routes
+router.post('/shared-available', authenticateToken, ridesController.getSharedAvailableRides);
+router.post('/join-shared/:rideId', authenticateToken, ridesController.joinSharedRide);
+router.get('/:rideId/passengers', ridesController.getRidePassengers);
+router.put('/:rideId/passengers/:passengerId/status', authenticateRider, ridesController.updatePassengerStatus);
+
 // Rider routes
 router.put('/:rideId/status', authenticateRider, ridesController.updateRideStatus);
 
