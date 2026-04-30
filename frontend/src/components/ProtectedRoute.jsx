@@ -3,8 +3,8 @@ import { Navigate } from "react-router-dom";
 
 export default function ProtectedRoute({ children }) {
   // Check if user or rider is logged in
-  const userToken = sessionStorage.getItem("token");
-  const riderToken = sessionStorage.getItem("riderToken");
+  const userToken = localStorage.getItem("token");
+  const riderToken = localStorage.getItem("riderToken");
 
   if (!userToken && !riderToken) {
     // Redirect to rider login if not authenticated

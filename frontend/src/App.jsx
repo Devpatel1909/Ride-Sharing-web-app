@@ -16,9 +16,15 @@ import ProtectedRoute from './components/ProtectedRoute'
 import MapPage from './pages/Map/MapPage'
 import Profile from './pages/Profile'
 import TrackingMap from './pages/TrackingMap'
+<<<<<<< HEAD
 import SharedRideSearch from './pages/Passanger/SharedRideSearch'
 import SharedRidesDashboard from './pages/Rider/SharedRidesDashboard'
 import CreateSharedRide from './pages/Rider/CreateSharedRide'
+=======
+import PaymentTab from './pages/Passanger/PaymentTab'
+import PaymentSuccess from './pages/Passanger/PaymentSuccess'
+import PaymentCancel from './pages/Passanger/PaymentCancel'
+>>>>>>> c3266098c53d87f030e42f01565ece40bef8b30b
 
 export default function App() {
   return (
@@ -87,6 +93,21 @@ export default function App() {
         <Route path="/tracking" element={
           <ProtectedRoute>
             <TrackingMap />
+          </ProtectedRoute>
+        } />
+        <Route path="/payment" element={
+          <ProtectedRoute>
+            <PaymentTab />
+          </ProtectedRoute>
+        } />
+        <Route path="/payment/success" element={
+          <ProtectedRoute>
+            <PaymentSuccess />
+          </ProtectedRoute>
+        } />
+        <Route path="/payment/cancel" element={
+          <ProtectedRoute>
+            <PaymentCancel />
           </ProtectedRoute>
         } />
 

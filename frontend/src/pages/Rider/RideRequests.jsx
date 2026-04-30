@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../../components/common/Header';
-import { MapPin, Clock, DollarSign, User, Phone, Navigation, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { MapPin, Clock, DollarSign, User, Phone, Navigation, CheckCircle, XCircle, AlertCircle, Loader, CreditCard } from 'lucide-react';
 import { riderAPI } from '../../services/api';
 import io from 'socket.io-client';
 
@@ -11,6 +11,8 @@ export default function RideRequests() {
   const [activeTab, setActiveTab] = useState('pending'); // pending, accepted, rejected
   const [rideRequests, setRideRequests] = useState([]);
   const [socket, setSocket] = useState(null);
+  const [paymentInProgressRide, setPaymentInProgressRide] = useState(null);
+  const [paymentCountdown, setPaymentCountdown] = useState(120);
 
   // Define fetchPendingRequests before useEffect hooks
   const fetchPendingRequests = async () => {
@@ -26,8 +28,8 @@ export default function RideRequests() {
 
   // Socket.IO connection - runs once on mount
   useEffect(() => {
-    const riderToken = sessionStorage.getItem('riderToken');
-    const rider = sessionStorage.getItem('rider');
+    const riderToken = localStorage.getItem('riderToken');
+    const rider = localStorage.getItem('rider');
     
     if (!riderToken) {
       navigate('/rider-login');
@@ -59,6 +61,33 @@ export default function RideRequests() {
           fetchPendingRequests();
         });
 
+        newSocket.on('ride-payment-status', (payload) => {
+          if (!payload?.rideId) return;
+          setRideRequests((prev) => prev.map((r) => (
+            r.id === payload.rideId
+              ? {
+                  ...r,
+                  paymentStatus: payload.paymentStatus || r.paymentStatus,
+                  status: payload.rideStatus || r.status,
+                }
+              : r
+          )));
+          if (paymentInProgressRide?.rideId === payload.rideId) {
+            setPaymentInProgressRide((prev) => prev ? {
+              ...prev,
+              paymentStatus: payload.paymentStatus,
+              status: payload.rideStatus || prev.status,
+            } : prev);
+
+            if (payload.paymentStatus === 'failed') {
+              const policy = payload.rideStatus === 'pending' ? 'reopened' : 'cancelled';
+              alert(`Passenger payment failed. Ride has been ${policy}.`);
+              setPaymentInProgressRide(null);
+              fetchPendingRequests();
+            }
+          }
+        });
+
         newSocket.on('disconnect', () => {
           console.log('❌ Socket disconnected from RideRequests');
         });
@@ -80,21 +109,78 @@ export default function RideRequests() {
         console.error('Error parsing rider data:', e);
       }
     }
-  }, [navigate]); // Only re-run if navigate changes
+  }, [navigate, paymentInProgressRide?.rideId]); // Only re-run if navigate changes
 
   // Fetch pending requests - separate effect
   useEffect(() => {
     fetchPendingRequests();
   }, []); // Run once on mount
 
+  useEffect(() => {
+    if (!paymentInProgressRide?.rideId) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const statusResult = await riderAPI.getRidePaymentStatus(paymentInProgressRide.rideId);
+        const ride = statusResult?.ride;
+        if (!ride) return;
+
+        if (ride.payment_status === 'completed' && (ride.status === 'accepted' || ride.status === 'in-progress')) {
+          const selectedRequest = rideRequests.find((r) => r.id === paymentInProgressRide.rideId) || {};
+          const rider = sessionStorage.getItem('rider');
+          const riderData = rider ? JSON.parse(rider) : {};
+
+          const [pickupCoords, destCoords] = await Promise.all([
+            geocodeAddress(selectedRequest.pickup || ''),
+            geocodeAddress(selectedRequest.dropoff || selectedRequest.destination || ''),
+          ]);
+
+          setPaymentInProgressRide(null);
+          navigate('/tracking', {
+            state: {
+              rideId: paymentInProgressRide.rideId,
+              role: 'rider',
+              pickup: selectedRequest.pickup || '',
+              destination: selectedRequest.dropoff || selectedRequest.destination || '',
+              pickupCoords,
+              destCoords,
+              riderName: `${riderData.firstName || ''} ${riderData.lastName || ''}`.trim(),
+              riderPhone: riderData.phone || '',
+              vehicleType: riderData.vehicle?.type || '',
+              vehiclePlate: riderData.vehicle?.plate || '',
+            }
+          });
+        }
+      } catch (error) {
+        console.warn('Payment status poll failed for rider:', error.message);
+      }
+    }, 3500);
+
+    return () => clearInterval(interval);
+  }, [geocodeAddress, navigate, paymentInProgressRide, rideRequests]);
+
+  useEffect(() => {
+    if (!paymentInProgressRide?.startedAt) {
+      setPaymentCountdown(120);
+      return;
+    }
+
+    const timer = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - paymentInProgressRide.startedAt) / 1000);
+      const left = Math.max(0, 120 - elapsed);
+      setPaymentCountdown(left);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [paymentInProgressRide?.startedAt]);
+
   const filteredRequests = rideRequests.filter(req => {
-    // Since API only returns pending, show all when on pending tab
-    if (activeTab === 'pending') return true;
-    // For accepted/rejected, filter by status if available
-    return req.status === activeTab;
+    if (activeTab === 'pending') return req.status === 'pending';
+    if (activeTab === 'accepted') return req.status === 'accepted';
+    return req.status === 'rejected';
   });
 
-  const geocodeAddress = async (address) => {
+  async function geocodeAddress(address) {
     try {
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
       const res = await fetch(`${API_BASE_URL}/geocoding/geocode?address=${encodeURIComponent(address)}`);
@@ -103,7 +189,7 @@ export default function RideRequests() {
       if (data.success && data.location) return { lat: data.location.lat, lng: data.location.lon };
       return null;
     } catch { return null; }
-  };
+  }
 
   const handleAcceptRide = async (rideId) => {
     try {
@@ -111,9 +197,21 @@ export default function RideRequests() {
       const result = await riderAPI.acceptRide(rideId);
       
       if (result.success) {
+        if (result.paymentRequired) {
+          setPaymentInProgressRide({
+            rideId,
+            paymentStatus: 'pending',
+            status: 'accepted',
+            startedAt: Date.now(),
+          });
+          setActiveTab('accepted');
+          await fetchPendingRequests();
+          return;
+        }
+
         // Find the accepted request so we can pass ride info to the tracking page
         const acceptedReq = rideRequests.find(r => r.id === rideId) || {};
-        const rider = sessionStorage.getItem('rider');
+        const rider = localStorage.getItem('rider');
         const riderData = rider ? JSON.parse(rider) : {};
 
         // Geocode pickup and destination so the tracking map can show the road route
@@ -200,6 +298,44 @@ export default function RideRequests() {
           </p>
         </div>
 
+        {paymentInProgressRide?.rideId && (
+          <div className="mb-6 rounded-3xl shadow-2xl shadow-blue-500/15 overflow-hidden border border-slate-200/60 bg-white/90 backdrop-blur-sm">
+            <div className="bg-linear-to-br from-blue-600 via-purple-600 to-purple-700 px-6 py-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center ring-4 ring-white/20">
+                  <CreditCard className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-white font-extrabold text-lg">Payment in Progress</p>
+                  <p className="text-white/75 text-sm">Ride #{paymentInProgressRide.rideId} is waiting for passenger checkout</p>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl p-4">
+                <Loader className="w-5 h-5 text-blue-600 animate-spin shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-blue-800">Waiting for payment confirmation...</p>
+                  <p className="text-xs text-blue-600 mt-0.5">Tracking screen opens automatically once payment completes.</p>
+                </div>
+                <span className="text-xs font-bold text-blue-700 bg-white px-2 py-1 rounded-lg">
+                  {Math.floor(paymentCountdown / 60)}:{String(paymentCountdown % 60).padStart(2, '0')}
+                </span>
+              </div>
+
+              <div>
+                <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+                  <div
+                    className="h-full bg-linear-to-r from-blue-600 via-purple-600 to-pink-500 transition-all duration-500"
+                    style={{ width: `${Math.max(4, ((120 - paymentCountdown) / 120) * 100)}%` }}
+                  />
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">Auto-refreshing payment state every few seconds.</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Tabs */}
         <div className="flex gap-3 p-2 mb-8 border-2 border-purple-200 bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl">
           <button
@@ -220,7 +356,7 @@ export default function RideRequests() {
                 : 'text-slate-600 hover:text-purple-700'
             }`}
           >
-            Accepted (0)
+            Accepted ({rideRequests.filter(r => r.status === 'accepted').length})
           </button>
           <button
             onClick={() => setActiveTab('rejected')}
@@ -389,6 +525,12 @@ export default function RideRequests() {
                           <XCircle className="w-6 h-6" />
                           <span className="text-lg">Reject</span>
                         </button>
+                      </div>
+                    )}
+
+                    {request.status === 'accepted' && request.paymentStatus !== 'completed' && (
+                      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 text-sm font-semibold text-center">
+                        Passenger payment in progress...
                       </div>
                     )}
                   </div>

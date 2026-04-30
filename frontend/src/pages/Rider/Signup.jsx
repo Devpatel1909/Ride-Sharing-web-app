@@ -37,8 +37,8 @@ export default function RiderAuth() {
   
   // Check if rider is already logged in and redirect to dashboard
   useEffect(() => {
-    const riderToken = sessionStorage.getItem('riderToken');
-    const rider = sessionStorage.getItem('rider');
+    const riderToken = localStorage.getItem('riderToken');
+    const rider = localStorage.getItem('rider');
     
     if (riderToken && rider) {
       // Rider is already logged in, redirect to dashboard
@@ -442,8 +442,8 @@ export default function RiderAuth() {
       const data = await response.json();
 
       if (response.ok) {
-        sessionStorage.setItem('riderToken', data.token);
-        sessionStorage.setItem('rider', JSON.stringify(data.rider));
+        localStorage.setItem('riderToken', data.token);
+        localStorage.setItem('rider', JSON.stringify(data.rider));
         navigate('/rider/dashboard', { replace: true });
       } else {
         alert(data.message || 'Login failed');
@@ -496,8 +496,8 @@ export default function RiderAuth() {
       const data = await response.json();
 
       if (response.ok) {
-        sessionStorage.setItem('riderToken', data.token);
-        sessionStorage.setItem('rider', JSON.stringify(data.rider));
+        localStorage.setItem('riderToken', data.token);
+        localStorage.setItem('rider', JSON.stringify(data.rider));
         navigate('/rider/dashboard', { replace: true });
       } else {
         alert(data.message || 'Signup failed');

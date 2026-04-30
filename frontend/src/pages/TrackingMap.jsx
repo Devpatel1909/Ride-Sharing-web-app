@@ -147,8 +147,8 @@ export default function TrackingMap() {
 
   // Determine which token to use
   const token = role === "rider"
-    ? sessionStorage.getItem("riderToken")
-    : sessionStorage.getItem("token");
+    ? localStorage.getItem("riderToken")
+    : localStorage.getItem("token");
 
   // ── Broadcast own GPS location ────────────────────────────────────────────
   const broadcastLocation = useCallback(() => {
@@ -195,8 +195,8 @@ export default function TrackingMap() {
       socket.emit("join-ride", { rideId, role });
 
       // Also register in personal room for compatibility
-      if (role === "rider") socket.emit("rider-online", sessionStorage.getItem("rider") ? JSON.parse(sessionStorage.getItem("rider"))?.id : null);
-      else socket.emit("passenger-join", sessionStorage.getItem("user") ? JSON.parse(sessionStorage.getItem("user"))?.id : null);
+      if (role === "rider") socket.emit("rider-online", localStorage.getItem("rider") ? JSON.parse(localStorage.getItem("rider"))?.id : null);
+      else socket.emit("passenger-join", localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user"))?.id : null);
 
       // Start broadcasting location immediately + every 3s (guard against duplicate intervals)
       broadcastLocation();

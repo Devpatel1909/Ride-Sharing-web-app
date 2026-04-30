@@ -28,9 +28,9 @@ export default function Login() {
       const data = await response.json();
 
       if (response.ok) {
-        // Store token in sessionStorage
-        sessionStorage.setItem("token", data.token);
-        sessionStorage.setItem("user", JSON.stringify(data.user));
+        // Store token in localStorage
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
 
         // Redirect to home
         navigate("/", { replace: true });
