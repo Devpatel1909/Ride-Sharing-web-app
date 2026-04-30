@@ -252,56 +252,8 @@ exports.bookRide = async (req, res) => {
 
     const rideId = insertResult.rows[0].id;
 
-    if (normalizedPaymentMethod !== 'cash') {
-      const stripe = getStripe();
-      if (!stripe) {
-        return res.status(500).json({
-          error: 'Stripe is not configured. Please set STRIPE_SECRET_KEY in backend environment.'
-        });
-      }
-
-      const session = await stripe.checkout.sessions.create({
-        mode: 'payment',
-        line_items: [
-          {
-            price_data: {
-              currency: 'inr',
-              product_data: {
-                name: `Ride Booking #${rideId}`,
-                description: `${pickup} to ${destination}`
-              },
-              unit_amount: Math.round(numericFare * 100)
-            },
-            quantity: 1
-          }
-        ],
-        metadata: {
-          rideId: String(rideId),
-          passengerId: String(passengerId),
-          preferredMethod: normalizedPaymentMethod
-        },
-        success_url: `${FRONTEND_URL}/payment/success?rideId=${rideId}&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${FRONTEND_URL}/payment/cancel?rideId=${rideId}`
-      });
-
-      await pool.query(
-        `
-          UPDATE rides
-          SET stripe_session_id = $1, updated_at = CURRENT_TIMESTAMP
-          WHERE id = $2
-        `,
-        [session.id, rideId]
-      );
-
-      return res.json({
-        success: true,
-        rideId,
-        requiresPayment: true,
-        checkoutUrl: session.url,
-        message: 'Ride created. Complete payment to dispatch the request to riders.'
-      });
-    }
-
+    // We now always return success here, regardless of payment method.
+    // Stripe session creation is deferred until a rider accepts the ride.
     const nearbyRiders = await notifyRidersForRide({
       rideId,
       passengerId,
@@ -311,19 +263,19 @@ exports.bookRide = async (req, res) => {
       fare,
       rideType,
       vehicleType,
-      pickupCoordinates: pickupLat && pickupLng ? { lat: pickupLat, lng: pickupLng } : null,
-      selectedRiderId: selectedRiderId || null
+      pickupCoordinates: { lat: pickupLat, lng: pickupLng }
     });
 
-    res.json({ 
-      success: true, 
+    return res.json({
+      success: true,
       rideId,
       paymentMethod: normalizedPaymentMethod,
       paymentStatus,
       nearbyRiders: nearbyRiders.length,
-      ridersNotified: nearbyRiders.map(r => ({ id: r.id, name: r.name, distance: r.distance })),
-      message: `Ride requested! ${nearbyRiders.length} nearby rider(s) notified.` 
+      message: 'Ride created and riders notified. Waiting for acceptance.'
     });
+
+    // The redundant second call was removed to fix SyntaxError.
   } catch (error) {
     console.error('Error booking ride:', error);
     res.status(500).json({ error: 'Failed to book ride' });
