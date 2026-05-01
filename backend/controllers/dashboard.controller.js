@@ -1,6 +1,7 @@
 const pool = require('../db/Connect_to_sql');
 const { emitRideAccepted, emitPaymentRequired, emitPaymentStatusUpdate } = require('../config/socket');
 const { createCheckoutSessionForRide } = require('./payments.controller');
+const { cleanupExpiredPendingRides } = require('../services/expired-ride-cleanup.service');
 
 const isNonCashMethod = (method) => ['upi', 'card', 'wallet'].includes(String(method || '').toLowerCase());
 
@@ -68,6 +69,9 @@ exports.getPendingRequests = async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
+    // Clean up stale pending ride requests older than 30 minutes
+    await cleanupExpiredPendingRides();
+
     // Get pending ride requests (PostgreSQL)
     const query = `
       SELECT 
@@ -84,10 +88,11 @@ exports.getPendingRequests = async (req, res) => {
         r.requested_at,
         u.full_name as passenger_name,
         u.email as passenger_email,
+        u.phone as passenger_phone,
         EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - r.requested_at))/60 as minutes_ago
       FROM rides r
       JOIN users u ON r.passenger_id = u.id
-      WHERE r.status = 'pending'
+      WHERE (r.status = 'pending' AND r.requested_at > CURRENT_TIMESTAMP - INTERVAL '30 minutes')
          OR (r.status = 'accepted' AND r.rider_id = $1)
       ORDER BY r.requested_at DESC
       LIMIT 20
@@ -98,20 +103,27 @@ exports.getPendingRequests = async (req, res) => {
     const requests = result.rows.map(row => ({
       id: row.id,
       passenger: row.passenger_name,
-      email: row.passenger_email,
+      passenger_name: row.passenger_name,
+      passenger_email: row.passenger_email,
+      passenger_phone: row.passenger_phone,
       pickup: row.pickup_location,
+      pickup_location: row.pickup_location,
       dropoff: row.destination,
+      destination: row.destination,
       distance: `${parseFloat(row.distance).toFixed(1)} km`,
       fare: `₹${parseFloat(row.fare).toFixed(0)}`,
       rideType: row.ride_type,
+      ride_type: row.ride_type,
       vehicleType: row.vehicle_type,
       status: row.status,
       paymentMethod: row.payment_method || 'cash',
+      payment_method: row.payment_method || 'cash',
       paymentStatus: row.payment_status || (row.payment_method === 'cash' ? 'completed' : 'pending'),
       time: row.minutes_ago < 1 ? 'Just now' : 
             row.minutes_ago < 60 ? `${Math.floor(row.minutes_ago)} mins ago` : 
             `${Math.floor(row.minutes_ago / 60)} hours ago`,
-      requestedAt: row.requested_at
+      requestedAt: row.requested_at,
+      passenger_rating: 5.0
     }));
 
     res.json({
@@ -210,7 +222,8 @@ exports.getRecentActivity = async (req, res) => {
         r.payment_method,
         r.status,
         r.completed_at,
-        u.full_name as passenger_name
+        u.full_name as passenger_name,
+        u.phone as passenger_phone
       FROM rides r
       JOIN users u ON r.passenger_id = u.id
       WHERE r.rider_id = $1 AND r.status IN ('completed', 'in-progress')
@@ -223,11 +236,15 @@ exports.getRecentActivity = async (req, res) => {
     const activities = result.rows.map(row => ({
       id: row.id,
       passenger: row.passenger_name,
+      passenger_name: row.passenger_name,
+      passenger_phone: row.passenger_phone,
       pickup: row.pickup_location,
+      pickup_location: row.pickup_location,
       destination: row.destination,
       distance: `${parseFloat(row.distance).toFixed(1)} km`,
       fare: `₹${parseFloat(row.fare).toFixed(0)}`,
       rideType: row.ride_type,
+      ride_type: row.ride_type,
       vehicleType: row.vehicle_type,
       payment_method: row.payment_method,
       paymentMethod: row.payment_method,
@@ -258,7 +275,7 @@ exports.acceptRide = async (req, res) => {
 
     // Check if ride exists and is pending
     const checkQuery = `
-      SELECT id, status, passenger_id, payment_method, payment_status, fare, pickup_location, destination
+      SELECT id, status, passenger_id, payment_method, payment_status, fare, pickup_location, destination, requested_at
       FROM rides
       WHERE id = $1
     `;
@@ -269,9 +286,13 @@ exports.acceptRide = async (req, res) => {
       return res.status(404).json({ error: 'Ride not found' });
     }
 
-    if (checkResult.rows[0].status !== 'pending') {
+    const rideRow = checkResult.rows[0];
+    if (rideRow.status !== 'pending') {
       return res.status(400).json({ error: 'Ride is not available for acceptance' });
     }
+
+    // Expired rides are already cleaned up by the cleanup service
+    // No need for redundant expiry check here
 
     // Update ride status to accepted
     const updateQuery = `

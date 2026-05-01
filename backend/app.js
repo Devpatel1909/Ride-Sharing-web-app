@@ -9,8 +9,20 @@ const paymentsController = require('./controllers/payments.controller');
 const app=express();
 
 // CORS configuration - must be before other middleware
+const allowedOrigins = [
+  process.env.FRONTEND_URL || 'http://localhost:5173',
+  'http://localhost:5173',
+  'http://localhost:5174'
+].filter(Boolean);
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`Not allowed by CORS: ${origin}`));
+    }
+  },
   credentials: true
 }));
 
@@ -74,10 +86,6 @@ app.use('/api/payments', paymentsRoutes);
 // geocoding routes
 const geocodingRoutes = require('./routes/geocoding.routes');
 app.use('/api/geocoding', geocodingRoutes);
-
-// payments routes
-const paymentsRoutes = require('./routes/payments.routes');
-app.use('/api/payments', paymentsRoutes);
 
 app.get('/',(req,res)=>{
     res.send('Hello World!');

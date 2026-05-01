@@ -47,9 +47,13 @@ export default function SignUp() {
       const data = await response.json();
 
       if (response.ok) {
-        // Store token in localStorage
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
+        // Clear any stale rider credentials
+        sessionStorage.removeItem('riderToken');
+        sessionStorage.removeItem('rider');
+
+        // Store token in sessionStorage
+        sessionStorage.setItem('token', data.token);
+        sessionStorage.setItem('user', JSON.stringify(data.user));
 
         // Redirect to home
         navigate('/', { replace: true });

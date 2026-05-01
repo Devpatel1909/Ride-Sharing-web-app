@@ -16,15 +16,10 @@ import ProtectedRoute from './components/ProtectedRoute'
 import MapPage from './pages/Map/MapPage'
 import Profile from './pages/Profile'
 import TrackingMap from './pages/TrackingMap'
-<<<<<<< HEAD
 import SharedRideSearch from './pages/Passanger/SharedRideSearch'
 import SharedRidesDashboard from './pages/Rider/SharedRidesDashboard'
 import CreateSharedRide from './pages/Rider/CreateSharedRide'
-=======
 import PaymentTab from './pages/Passanger/PaymentTab'
-import PaymentSuccess from './pages/Passanger/PaymentSuccess'
-import PaymentCancel from './pages/Passanger/PaymentCancel'
->>>>>>> c3266098c53d87f030e42f01565ece40bef8b30b
 
 export default function App() {
   return (
@@ -36,57 +31,47 @@ export default function App() {
         <Route path="/auth/google/success" element={<GoogleAuthCallback />} />
         <Route path="/rider-login" element={<Rider_login />} />
         <Route path="/rider/dashboard" element={
-          <ProtectedRoute>
+          <ProtectedRoute role="rider">
             <RiderDashboard />
           </ProtectedRoute>
         } />
         <Route path="/rider-dashboard" element={
-          <ProtectedRoute>
+          <ProtectedRoute role="rider">
             <RiderDashboard />
           </ProtectedRoute>
         } />
         <Route path="/rider-dashboard/ride/:rideId" element={
-          <ProtectedRoute>
+          <ProtectedRoute role="rider">
             <SharedRidesDashboard />
           </ProtectedRoute>
         } />
         <Route path="/rider/create-shared-ride" element={
-          <ProtectedRoute>
+          <ProtectedRoute role="rider">
             <CreateSharedRide />
           </ProtectedRoute>
         } />
         <Route path="/rider/ride-requests" element={
-          <ProtectedRoute>
+          <ProtectedRoute role="rider">
             <RideRequests />
           </ProtectedRoute>
         } />
         <Route path="/profile" element={
-          <ProtectedRoute>
+          <ProtectedRoute role="passenger">
             <Profile />
           </ProtectedRoute>
         } />
         <Route path="/ride-search" element={
-          <ProtectedRoute>
+          <ProtectedRoute role="passenger">
             <RideSearch />
           </ProtectedRoute>
         } />
         <Route path="/shared-ride-search" element={
-          <ProtectedRoute>
+          <ProtectedRoute role="passenger">
             <SharedRideSearch />
           </ProtectedRoute>
         } />
-        <Route path="/payment/success" element={
-          <ProtectedRoute>
-            <PaymentSuccess />
-          </ProtectedRoute>
-        } />
-        <Route path="/payment/cancel" element={
-          <ProtectedRoute>
-            <PaymentCancel />
-          </ProtectedRoute>
-        } />
         <Route path="/map" element={
-          <ProtectedRoute>
+          <ProtectedRoute role="passenger">
             <MapPage />
            </ProtectedRoute>
         } />
@@ -96,17 +81,17 @@ export default function App() {
           </ProtectedRoute>
         } />
         <Route path="/payment" element={
-          <ProtectedRoute>
+          <ProtectedRoute role="passenger">
             <PaymentTab />
           </ProtectedRoute>
         } />
         <Route path="/payment/success" element={
-          <ProtectedRoute>
+          <ProtectedRoute role="passenger">
             <PaymentSuccess />
           </ProtectedRoute>
         } />
         <Route path="/payment/cancel" element={
-          <ProtectedRoute>
+          <ProtectedRoute role="passenger">
             <PaymentCancel />
           </ProtectedRoute>
         } />

@@ -28,8 +28,8 @@ export default function RideRequests() {
 
   // Socket.IO connection - runs once on mount
   useEffect(() => {
-    const riderToken = localStorage.getItem('riderToken');
-    const rider = localStorage.getItem('rider');
+    const riderToken = sessionStorage.getItem('riderToken');
+    const rider = sessionStorage.getItem('rider');
     
     if (!riderToken) {
       navigate('/rider-login');
@@ -211,7 +211,7 @@ export default function RideRequests() {
 
         // Find the accepted request so we can pass ride info to the tracking page
         const acceptedReq = rideRequests.find(r => r.id === rideId) || {};
-        const rider = localStorage.getItem('rider');
+        const rider = sessionStorage.getItem('rider');
         const riderData = rider ? JSON.parse(rider) : {};
 
         // Geocode pickup and destination so the tracking map can show the road route
@@ -432,7 +432,7 @@ export default function RideRequests() {
                     <div className="p-4 bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl">
                       <div className="flex items-center gap-2 text-sm text-slate-700">
                         <Phone className="w-4 h-4 text-purple-600" />
-                        <span className="font-medium">{request.phone || request.email || 'Hidden'}</span>
+                        <span className="font-medium">{request.passenger_phone || request.phone || request.email || 'Hidden'}</span>
                       </div>
                     </div>
 

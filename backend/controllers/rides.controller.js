@@ -292,7 +292,7 @@ exports.bookRide = async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const normalizedPaymentMethod = String(paymentMethod || '').toLowerCase();
+    const normalizedPaymentMethod = String(paymentMethod || 'cash').toLowerCase();
     if (!VALID_PAYMENT_METHODS.includes(normalizedPaymentMethod)) {
       return res.status(400).json({
         error: `Invalid payment method. Allowed values: ${VALID_PAYMENT_METHODS.join(', ')}`
@@ -317,7 +317,6 @@ exports.bookRide = async (req, res) => {
       }
     }
 
-<<<<<<< HEAD
     // Parse destination coordinates if provided
     if (req.body.destinationCoordinates) {
       dropoffLat = req.body.destinationCoordinates.lat;
@@ -331,10 +330,7 @@ exports.bookRide = async (req, res) => {
     }
 
     await client.query('BEGIN');
-=======
-    const normalizedPaymentMethod = String(paymentMethod || 'cash').toLowerCase();
     const paymentStatus = normalizedPaymentMethod === 'cash' ? 'completed' : 'pending';
->>>>>>> c3266098c53d87f030e42f01565ece40bef8b30b
 
     // Insert the ride into database
     const insertQuery = `

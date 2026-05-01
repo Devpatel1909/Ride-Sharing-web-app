@@ -16,6 +16,7 @@ export default function RiderDashboard() {
   const [stats, setStats] = useState(null);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [recentActivities, setRecentActivities] = useState([]);
+  const pendingOnlyRequests = pendingRequests.filter((request) => request.status === 'pending');
   // Initialize isOnline from localStorage to persist across refreshes
   const [isOnline, setIsOnline] = useState(() => {
     const saved = localStorage.getItem('riderIsOnline');
@@ -36,8 +37,8 @@ export default function RiderDashboard() {
 
   // Socket.IO connection - separate from data fetching
   useEffect(() => {
-    const riderToken = localStorage.getItem('riderToken');
-    const rider = localStorage.getItem('rider');
+    const riderToken = sessionStorage.getItem('riderToken');
+    const rider = sessionStorage.getItem('rider');
 
     if (!riderToken) {
       navigate('/rider-login');
@@ -120,7 +121,7 @@ export default function RiderDashboard() {
 
   // Fetch dashboard data - separate effect
   useEffect(() => {
-    const riderToken = localStorage.getItem('riderToken');
+    const riderToken = sessionStorage.getItem('riderToken');
     if (riderToken) {
       fetchDashboardData({ showLoader: true });
     }
@@ -288,8 +289,8 @@ export default function RiderDashboard() {
       console.error('❌ Failed to update availability:', error);
 
       if (error?.status === 401 || error?.status === 403) {
-        localStorage.removeItem('riderToken');
-        localStorage.removeItem('rider');
+        sessionStorage.removeItem('riderToken');
+        sessionStorage.removeItem('rider');
         localStorage.removeItem('riderIsOnline');
         alert('Your rider session expired. Please login again.');
         navigate('/rider-login', { replace: true });
@@ -626,15 +627,15 @@ export default function RiderDashboard() {
               </div>
               <div className="relative flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-purple-100 to-blue-100">
                 <Bell className="w-6 h-6 text-purple-600" />
-                {pendingRequests.length > 0 && (
+                {pendingOnlyRequests.length > 0 && (
                   <div className="absolute flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-red-500 rounded-full -top-2 -right-2 animate-pulse">
-                    {pendingRequests.length}
+                    {pendingOnlyRequests.length}
                   </div>
                 )}
               </div>
             </div>
 
-            {pendingRequests.length === 0 ? (
+            {pendingOnlyRequests.length === 0 ? (
               <div className="py-12 text-center">
                 <div className="flex items-center justify-center w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-purple-100 to-blue-100">
                   <Zap className="w-10 h-10 text-purple-600" />
@@ -646,7 +647,7 @@ export default function RiderDashboard() {
               <>
                 {/* Preview of requests */}
                 <div className="space-y-4 mb-6">
-                  {pendingRequests.slice(0, 3).map((request) => (
+                  {pendingOnlyRequests.slice(0, 3).map((request) => (
                     <div
                       key={request.id}
                       className="p-5 transition-all duration-300 ease-out border-2 border-transparent bg-gradient-to-br from-purple-50 to-blue-50 rounded-2xl hover:border-purple-300 hover:shadow-xl group"
@@ -658,10 +659,10 @@ export default function RiderDashboard() {
                               👤
                             </div>
                             <div>
-                              <p className="font-bold text-slate-900 font-display">{request.passenger_name || 'Passenger'}</p>
+                              <p className="font-bold text-slate-900 font-display">{request.passenger_name || request.passenger || 'Passenger'}</p>
                               <div className="flex items-center gap-2 text-xs text-slate-600">
                                 <Phone className="w-3 h-3" />
-                                <span>{request.passenger_phone || 'Hidden'}</span>
+                                <span>{request.passenger_phone || request.phone || request.email || 'Hidden'}</span>
                               </div>
                             </div>
                           </div>
@@ -670,7 +671,7 @@ export default function RiderDashboard() {
                           <div className="px-4 py-2 mb-1 text-lg font-bold text-green-700 bg-green-100 rounded-full font-display">
                             {formatRupee(request.fare)}
                           </div>
-                          <div className="text-xs text-slate-500">{request.distance || 0}km</div>
+                          <div className="text-xs text-slate-500">{request.distance || '0 km'}</div>
                         </div>
                       </div>
                       
@@ -681,7 +682,7 @@ export default function RiderDashboard() {
                           </div>
                           <div className="flex-1">
                             <p className="text-xs font-medium text-slate-500">Pickup</p>
-                            <p className="font-medium text-slate-800">📍 {request.pickup_location}</p>
+                            <p className="font-medium text-slate-800">📍 {request.pickup_location || request.pickup || 'Pickup location'}</p>
                           </div>
                         </div>
                         <div className="flex items-start gap-2 text-sm">
@@ -690,7 +691,7 @@ export default function RiderDashboard() {
                           </div>
                           <div className="flex-1">
                             <p className="text-xs font-medium text-slate-500">Dropoff</p>
-                            <p className="font-medium text-slate-800">🎯 {request.destination}</p>
+                            <p className="font-medium text-slate-800">🎯 {request.destination || request.dropoff || 'Destination'}</p>
                           </div>
                         </div>
                       </div>
@@ -723,7 +724,7 @@ export default function RiderDashboard() {
                   className="relative flex items-center justify-center w-full gap-3 px-6 py-4 overflow-hidden font-bold text-white transition-all duration-300 ease-out shadow-xl bg-gradient-to-r from-purple-600 via-blue-600 to-purple-700 rounded-2xl hover:from-purple-700 hover:via-blue-700 hover:to-purple-800 shadow-purple-500/50 hover:shadow-purple-600/70 hover:-translate-y-1 hover:scale-105 group font-display"
                 >
                   <div className="absolute inset-0 transition-opacity duration-300 ease-out opacity-0 bg-gradient-to-r from-blue-700 via-purple-600 to-blue-600 group-hover:opacity-100"></div>
-                  <span className="relative z-10 text-lg">View All Requests ({pendingRequests.length})</span>
+                  <span className="relative z-10 text-lg">View All Requests ({pendingOnlyRequests.length})</span>
                   <CheckCircle className="relative z-10 w-6 h-6 transition-transform duration-300 ease-out group-hover:scale-110" />
                 </button>
               </>

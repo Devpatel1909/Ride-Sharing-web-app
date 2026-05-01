@@ -30,11 +30,19 @@ export default function Landing() {
 
   // Check if rider is already logged in and redirect to dashboard
   useEffect(() => {
-    const riderToken = localStorage.getItem('riderToken');
-    const rider = localStorage.getItem('rider');
-    
-    if (riderToken && rider) {
-      // Rider is logged in, redirect to dashboard
+    const token = sessionStorage.getItem('token');
+    const riderToken = sessionStorage.getItem('riderToken');
+    const rider = sessionStorage.getItem('rider');
+
+    if (token && riderToken) {
+      // Passenger session exists, clear stale rider credentials to prevent wrong redirect
+      sessionStorage.removeItem('riderToken');
+      sessionStorage.removeItem('rider');
+      return;
+    }
+
+    if (riderToken && rider && !token) {
+      // Rider is logged in and no passenger session exists, redirect to dashboard
       navigate('/rider/dashboard', { replace: true });
     }
   }, [navigate]);
@@ -466,8 +474,8 @@ export default function Landing() {
 
   // Check if user is authenticated
   const handleSearchRide = () => {
-    const token = localStorage.getItem("token");
-    const riderToken = localStorage.getItem("riderToken");
+    const token = sessionStorage.getItem("token");
+    const riderToken = sessionStorage.getItem("riderToken");
 
     if (!token && !riderToken) {
       setAuthWarning("Please sign up or login to search for rides");

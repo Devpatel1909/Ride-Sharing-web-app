@@ -2,6 +2,7 @@ const http = require('http');
 const app = require('./app');
 const { initializeSocket } = require('./config/socket');
 const pool = require('./db/Connect_to_sql');
+const { cleanupExpiredPendingRides } = require('./services/expired-ride-cleanup.service');
 require("dotenv").config();
 
 const port = process.env.PORT || 3000;
@@ -24,6 +25,13 @@ async function startServer() {
             console.log(`📡 Environment: ${process.env.NODE_ENV || 'development'}`);
             console.log(`🌐 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
             console.log(`⚡ WebSocket ready for real-time communication`);
+
+            // Periodically remove expired pending ride requests older than 30 minutes
+            const cleanupIntervalMs = 5 * 60 * 1000; // every 5 minutes
+            cleanupExpiredPendingRides().catch(err => console.error('Initial expired ride cleanup failed:', err));
+            setInterval(() => {
+              cleanupExpiredPendingRides().catch(err => console.error('Expired ride cleanup failed:', err));
+            }, cleanupIntervalMs);
         });
 
         server.on('error', (err) => {
