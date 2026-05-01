@@ -448,11 +448,11 @@ exports.getRideDetails = async (req, res) => {
           CONCAT(rider.first_name, ' ', rider.last_name) as rider_name,
           rider.email as rider_email,
           rider.phone as rider_phone,
-          rider.vehicle_type,
+          rider.vehicle_type as rider_vehicle_type,
           rider.vehicle_model,
           rider.vehicle_plate as vehicle_number
         FROM rides r
-        JOIN users u ON r.passenger_id = u.id
+        LEFT JOIN users u ON r.passenger_id = u.id
         LEFT JOIN riders rider ON r.rider_id = rider.id
         WHERE r.id = $1
       `;
@@ -465,7 +465,17 @@ exports.getRideDetails = async (req, res) => {
         throw notFoundError;
       }
 
-      return result.rows[0];
+      const rideData = result.rows[0];
+      
+      // Transform database columns to frontend format
+      return {
+        ...rideData,
+        rideId: rideData.id,
+        pickupLocation: rideData.pickup_location,
+        dropoffLocation: rideData.destination,
+        totalFare: rideData.fare,
+        passengers: [] // Will be populated separately if needed
+      };
     });
 
     res.json({ success: true, ride });
@@ -983,11 +993,15 @@ exports.createSharedRide = async (req, res) => {
     await client.query('BEGIN');
 
     // Insert the shared ride
+    // For shared rides, distance can be provided or defaults to 0
+    // It will be calculated later when the route is determined
+    const distance = req.body.distance || 0;
+    
     const insertQuery = `
       INSERT INTO rides 
-      (rider_id, pickup_location, destination, ride_type, vehicle_type, fare, 
+      (rider_id, passenger_id, pickup_location, destination, distance, ride_type, vehicle_type, fare, 
        status, max_passengers, current_passengers, requested_at)
-      VALUES ($1, $2, $3, 'shared', $4, $5, 'pending', $6, 1, CURRENT_TIMESTAMP)
+      VALUES ($1, NULL, $2, $3, $4, 'shared', $5, $6, 'pending', $7, 1, CURRENT_TIMESTAMP)
       RETURNING id
     `;
 
@@ -995,6 +1009,7 @@ exports.createSharedRide = async (req, res) => {
       riderId,
       pickupLocation,
       dropoffLocation,
+      distance,
       vehicleType || 'sedan',
       numericFare,
       maxPassengers
@@ -1004,6 +1019,7 @@ exports.createSharedRide = async (req, res) => {
       riderId,
       pickupLocation,
       dropoffLocation,
+      distance,
       vehicleType || 'sedan',
       numericFare,
       maxPassengers

@@ -29,7 +29,7 @@ export default function SharedRidesDashboard() {
         setLoading(true);
         // Fetch ride details from API
         const response = await fetch(
-          `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/rides/${rideId}`,
+          `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/rides/${rideId}`,
           {
             headers: {
               'Authorization': `Bearer ${sessionStorage.getItem('riderToken')}`
@@ -40,7 +40,31 @@ export default function SharedRidesDashboard() {
         if (!response.ok) throw new Error('Failed to fetch ride');
 
         const data = await response.json();
-        setRide(data.ride);
+        let rideData = data.ride;
+
+        // Fetch passengers for this ride if it's a shared ride
+        if (rideData.ride_type === 'shared') {
+          try {
+            const passengersResponse = await fetch(
+              `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/rides/${rideId}/passengers`,
+              {
+                headers: {
+                  'Authorization': `Bearer ${sessionStorage.getItem('riderToken')}`
+                }
+              }
+            );
+            
+            if (passengersResponse.ok) {
+              const passengersData = await passengersResponse.json();
+              rideData.passengers = passengersData.passengers || [];
+            }
+          } catch (passengersErr) {
+            console.error('Error fetching passengers:', passengersErr);
+            rideData.passengers = [];
+          }
+        }
+
+        setRide(rideData);
       } catch (err) {
         console.error('Error fetching ride:', err);
         setError(err.message);
@@ -60,7 +84,7 @@ export default function SharedRidesDashboard() {
       await ridesAPI.updatePassengerStatus(rideId, passengerId, newStatus);
       // Refresh ride data
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/rides/${rideId}`,
+        `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/rides/${rideId}`,
         {
           headers: {
             'Authorization': `Bearer ${sessionStorage.getItem('riderToken')}`
@@ -81,7 +105,7 @@ export default function SharedRidesDashboard() {
 
     try {
       await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/rides/${rideId}/cancel`,
+        `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/rides/${rideId}/cancel`,
         {
           method: 'POST',
           headers: {

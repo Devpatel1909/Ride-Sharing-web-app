@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS rides (
   id INT PRIMARY KEY AUTO_INCREMENT,
   rider_id INT,
-  passenger_id INT NOT NULL,
+  passenger_id INT,
   pickup_location VARCHAR(500) NOT NULL,
   destination VARCHAR(500) NOT NULL,
   distance DECIMAL(10,2) NOT NULL,

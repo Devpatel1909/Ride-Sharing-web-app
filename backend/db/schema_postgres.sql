@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS rides (
   id SERIAL PRIMARY KEY,
   rider_id INT,
   selected_rider_id INT,
-  passenger_id INT NOT NULL,
+  passenger_id INT,
   pickup_location VARCHAR(500) NOT NULL,
   destination VARCHAR(500) NOT NULL,
   distance DECIMAL(10,2) NOT NULL,

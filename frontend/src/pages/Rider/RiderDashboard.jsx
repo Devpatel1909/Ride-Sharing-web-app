@@ -858,13 +858,21 @@ export default function RiderDashboard() {
                     <p className="text-xs text-amber-600 font-medium">💰 Earn more</p>
                   </div>
                 </div>
-                <button
-                  onClick={() => navigate('/rider/create-shared-ride')}
-                  className="w-full px-4 py-3 font-bold text-white bg-gradient-to-r from-amber-600 to-orange-600 rounded-xl hover:from-amber-700 hover:to-orange-700 transition-all duration-300 ease-out hover:shadow-lg"
-                >
-                  + Post Shared Ride
-                </button>
-                <p className="mt-3 text-xs text-center text-amber-700">Split fares with other passengers</p>
+                <div className="space-y-3">
+                   <button
+                     onClick={() => navigate('/rider/create-shared-ride')}
+                     className="w-full px-4 py-3 font-bold text-white bg-gradient-to-r from-amber-600 to-orange-600 rounded-xl hover:from-amber-700 hover:to-orange-700 transition-all duration-300 ease-out hover:shadow-lg"
+                   >
+                     + Post Shared Ride
+                   </button>
+                   <button
+                     onClick={() => navigate('/rider/shared-rides')}
+                     className="w-full px-4 py-3 font-bold text-amber-700 bg-amber-100 rounded-xl hover:bg-amber-200 transition-all duration-300 ease-out hover:shadow-lg border-2 border-amber-200"
+                   >
+                     📋 View My Shared Rides
+                   </button>
+                 </div>
+                 <p className="mt-3 text-xs text-center text-amber-700">Split fares with other passengers</p>
               </div>
 
               {/* Location */}
