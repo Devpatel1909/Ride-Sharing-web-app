@@ -21,9 +21,21 @@ export default function SharedRideSearchPage() {
     setSelectedRide(null);
 
     // Optionally navigate to tracking
+    const trackingState = { 
+      rideId: rideData.rideId, 
+      rideData: rideData.ride,
+      role: 'passenger',
+      pickup: rideData.pickup_location || '',
+      destination: rideData.destination_location || '',
+      pickupCoords: rideData.pickup_coords ? JSON.parse(rideData.pickup_coords) : null,
+      destCoords: rideData.destination_coords ? JSON.parse(rideData.destination_coords) : null,
+    };
+    
+    sessionStorage.setItem('currentRideTracking', JSON.stringify(trackingState));
+    
     setTimeout(() => {
       navigate('/tracking', {
-        state: { rideId: rideData.rideId, rideData: rideData.ride }
+        state: trackingState
       });
     }, 2000);
   };

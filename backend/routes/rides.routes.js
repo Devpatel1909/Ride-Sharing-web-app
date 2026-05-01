@@ -10,6 +10,7 @@ router.post('/book', authenticateToken, ridesController.bookRide);
 router.get('/:rideId', ridesController.getRideDetails);
 
 // Shared ride routes
+router.post('/shared/create', authenticateRider, ridesController.createSharedRide);
 router.post('/shared-available', authenticateToken, ridesController.getSharedAvailableRides);
 router.post('/join-shared/:rideId', authenticateToken, ridesController.joinSharedRide);
 router.get('/:rideId/passengers', ridesController.getRidePassengers);

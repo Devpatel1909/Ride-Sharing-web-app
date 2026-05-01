@@ -352,19 +352,25 @@ export default function RideSearch() {
     const goToTracking = (rideId, riderName, riderPhone, vehicleType, vehiclePlate) => {
       if (didNavigate) return;
       didNavigate = true;
+      
+      const trackingState = {
+        rideId,
+        role:         "passenger",
+        riderName:    riderName    || "",
+        riderPhone:   riderPhone   || "",
+        vehicleType:  vehicleType  || "",
+        vehiclePlate: vehiclePlate || "",
+        pickup: booked?.pickup || pickup,
+        destination: booked?.destination || destination,
+        pickupCoords: booked?.pickupCoords || pickupCoords,
+        destCoords: booked?.destCoords || destCoords,
+      };
+      
+      // Save to sessionStorage so it persists on page reload
+      sessionStorage.setItem('currentRideTracking', JSON.stringify(trackingState));
+      
       navigate("/tracking", {
-        state: {
-          rideId,
-          role:         "passenger",
-          riderName:    riderName    || "",
-          riderPhone:   riderPhone   || "",
-          vehicleType:  vehicleType  || "",
-          vehiclePlate: vehiclePlate || "",
-          pickup: booked?.pickup || pickup,
-          destination: booked?.destination || destination,
-          pickupCoords: booked?.pickupCoords || pickupCoords,
-          destCoords: booked?.destCoords || destCoords,
-        },
+        state: trackingState,
       });
     };
 

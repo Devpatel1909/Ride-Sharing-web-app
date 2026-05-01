@@ -136,19 +136,24 @@ export default function RideRequests() {
           ]);
 
           setPaymentInProgressRide(null);
+          
+          const trackingState = {
+            rideId: paymentInProgressRide.rideId,
+            role: 'rider',
+            pickup: selectedRequest.pickup || '',
+            destination: selectedRequest.dropoff || selectedRequest.destination || '',
+            pickupCoords,
+            destCoords,
+            riderName: `${riderData.firstName || ''} ${riderData.lastName || ''}`.trim(),
+            riderPhone: riderData.phone || '',
+            vehicleType: riderData.vehicle?.type || '',
+            vehiclePlate: riderData.vehicle?.plate || '',
+          };
+          
+          sessionStorage.setItem('currentRideTracking', JSON.stringify(trackingState));
+          
           navigate('/tracking', {
-            state: {
-              rideId: paymentInProgressRide.rideId,
-              role: 'rider',
-              pickup: selectedRequest.pickup || '',
-              destination: selectedRequest.dropoff || selectedRequest.destination || '',
-              pickupCoords,
-              destCoords,
-              riderName: `${riderData.firstName || ''} ${riderData.lastName || ''}`.trim(),
-              riderPhone: riderData.phone || '',
-              vehicleType: riderData.vehicle?.type || '',
-              vehiclePlate: riderData.vehicle?.plate || '',
-            }
+            state: trackingState
           });
         }
       } catch (error) {
@@ -221,19 +226,23 @@ export default function RideRequests() {
         ]);
 
         // Navigate to live tracking map
+        const trackingState = {
+          rideId,
+          role: 'rider',
+          pickup: acceptedReq.pickup || '',
+          destination: acceptedReq.dropoff || '',
+          pickupCoords,
+          destCoords,
+          riderName: `${riderData.firstName || ''} ${riderData.lastName || ''}`.trim(),
+          riderPhone: riderData.phone || '',
+          vehicleType: riderData.vehicle?.type || '',
+          vehiclePlate: riderData.vehicle?.plate || '',
+        };
+        
+        sessionStorage.setItem('currentRideTracking', JSON.stringify(trackingState));
+        
         navigate('/tracking', {
-          state: {
-            rideId,
-            role: 'rider',
-            pickup: acceptedReq.pickup || '',
-            destination: acceptedReq.dropoff || '',
-            pickupCoords,
-            destCoords,
-            riderName: `${riderData.firstName || ''} ${riderData.lastName || ''}`.trim(),
-            riderPhone: riderData.phone || '',
-            vehicleType: riderData.vehicle?.type || '',
-            vehiclePlate: riderData.vehicle?.plate || '',
-          }
+          state: trackingState
         });
       }
     } catch (error) {

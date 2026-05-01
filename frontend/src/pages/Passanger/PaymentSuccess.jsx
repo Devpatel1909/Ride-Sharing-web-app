@@ -43,20 +43,25 @@ export default function PaymentSuccess() {
         if (ride?.payment_status === 'completed' && (ride?.status === 'accepted' || ride?.status === 'in-progress')) {
           setStatusText('Payment confirmed. Redirecting to live tracking...');
           sessionStorage.removeItem('pendingRidePayment');
+          
+          const trackingState = {
+            rideId: resolvedRideId,
+            role: 'passenger',
+            riderName: ride?.rider_name || pendingRidePayment?.riderName || '',
+            riderPhone: ride?.rider_phone || pendingRidePayment?.riderPhone || '',
+            vehicleType: ride?.vehicle_type || pendingRidePayment?.vehicleType || '',
+            vehiclePlate: ride?.vehicle_number || pendingRidePayment?.vehiclePlate || '',
+            pickup: pendingRidePayment?.pickup || '',
+            destination: pendingRidePayment?.destination || '',
+            pickupCoords: pendingRidePayment?.pickupCoords || null,
+            destCoords: pendingRidePayment?.destCoords || null,
+          };
+          
+          sessionStorage.setItem('currentRideTracking', JSON.stringify(trackingState));
+          
           setTimeout(() => {
             navigate('/tracking', {
-              state: {
-                rideId: resolvedRideId,
-                role: 'passenger',
-                riderName: ride?.rider_name || pendingRidePayment?.riderName || '',
-                riderPhone: ride?.rider_phone || pendingRidePayment?.riderPhone || '',
-                vehicleType: ride?.vehicle_type || pendingRidePayment?.vehicleType || '',
-                vehiclePlate: ride?.vehicle_number || pendingRidePayment?.vehiclePlate || '',
-                pickup: pendingRidePayment?.pickup || '',
-                destination: pendingRidePayment?.destination || '',
-                pickupCoords: pendingRidePayment?.pickupCoords || null,
-                destCoords: pendingRidePayment?.destCoords || null,
-              },
+              state: trackingState,
             });
           }, 1200);
           return;
@@ -88,19 +93,23 @@ export default function PaymentSuccess() {
     const resolvedRideId = Number(rideId || pendingRidePayment?.rideId);
     if (!resolvedRideId || !rideData) return;
 
+    const trackingState = {
+      rideId: resolvedRideId,
+      role: 'passenger',
+      riderName: rideData?.rider_name || pendingRidePayment?.riderName || '',
+      riderPhone: rideData?.rider_phone || pendingRidePayment?.riderPhone || '',
+      vehicleType: rideData?.vehicle_type || pendingRidePayment?.vehicleType || '',
+      vehiclePlate: rideData?.vehicle_number || pendingRidePayment?.vehiclePlate || '',
+      pickup: pendingRidePayment?.pickup || '',
+      destination: pendingRidePayment?.destination || '',
+      pickupCoords: pendingRidePayment?.pickupCoords || null,
+      destCoords: pendingRidePayment?.destCoords || null,
+    };
+    
+    sessionStorage.setItem('currentRideTracking', JSON.stringify(trackingState));
+    
     navigate('/tracking', {
-      state: {
-        rideId: resolvedRideId,
-        role: 'passenger',
-        riderName: rideData?.rider_name || pendingRidePayment?.riderName || '',
-        riderPhone: rideData?.rider_phone || pendingRidePayment?.riderPhone || '',
-        vehicleType: rideData?.vehicle_type || pendingRidePayment?.vehicleType || '',
-        vehiclePlate: rideData?.vehicle_number || pendingRidePayment?.vehiclePlate || '',
-        pickup: pendingRidePayment?.pickup || '',
-        destination: pendingRidePayment?.destination || '',
-        pickupCoords: pendingRidePayment?.pickupCoords || null,
-        destCoords: pendingRidePayment?.destCoords || null,
-      },
+      state: trackingState,
     });
   };
 

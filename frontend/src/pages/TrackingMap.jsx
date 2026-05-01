@@ -107,6 +107,19 @@ export default function TrackingMap() {
   const navigate = useNavigate();
 
   // Extract data passed via navigation state
+  const initialState = state || {};
+  
+  // State for ride data (to persist it across page reloads)
+  const [rideData, setRideData] = useState(() => {
+    // First try to get from navigation state
+    if (initialState.rideId) {
+      return initialState;
+    }
+    // Then try to get from sessionStorage (persists across reloads)
+    const saved = sessionStorage.getItem('currentRideTracking');
+    return saved ? JSON.parse(saved) : {};
+  });
+
   const {
     rideId,
     role,          // "rider" | "passenger"
@@ -118,7 +131,14 @@ export default function TrackingMap() {
     destination,
     pickupCoords,
     destCoords,
-  } = state || {};
+  } = rideData;
+
+  // Save ride data to sessionStorage whenever it changes
+  useEffect(() => {
+    if (rideId && role) {
+      sessionStorage.setItem('currentRideTracking', JSON.stringify(rideData));
+    }
+  }, [rideId, role, rideData]);
 
   const [myLocation, setMyLocation] = useState(null);
   const [otherLocation, setOtherLocation] = useState(null);
@@ -129,6 +149,7 @@ export default function TrackingMap() {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [routeCoords, setRouteCoords] = useState([]);       // [{lat,lng},...] road path
   const [riderHeading, setRiderHeading] = useState(0);
+  const [isLoading, setIsLoading] = useState(!rideId);      // Loading state when fetching ride details
   const [mapCenter] = useState(
     pickupCoords ? { lat: pickupCoords.lat, lng: pickupCoords.lng } : { lat: 20.5937, lng: 78.9629 }
   );
@@ -149,6 +170,44 @@ export default function TrackingMap() {
   const token = role === "rider"
     ? sessionStorage.getItem("riderToken")
     : sessionStorage.getItem("token");
+
+  // Fetch ride details from backend if not available in state
+  useEffect(() => {
+    if (rideId || !isLoading) return;
+
+    const fetchRideDetails = async () => {
+      try {
+        const result = await riderAPI.getRideDetails ? 
+          await riderAPI.getRideDetails(rideId) : 
+          null;
+
+        if (result?.ride) {
+          const ride = result.ride;
+          setRideData({
+            rideId: ride.id,
+            role: role || "passenger",
+            riderName: ride.rider_name || "",
+            riderPhone: ride.rider_phone || "",
+            vehicleType: ride.vehicle_type || "",
+            vehiclePlate: ride.vehicle_number || "",
+            pickup: ride.pickup_location || "",
+            destination: ride.destination_location || "",
+            pickupCoords: ride.pickup_coords ? JSON.parse(ride.pickup_coords) : null,
+            destCoords: ride.destination_coords ? JSON.parse(ride.destination_coords) : null,
+          });
+          setRideStatus(ride.status || "accepted");
+        }
+      } catch (err) {
+        console.warn("Failed to fetch ride details:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    // This would only run if we had a rideId but no ride data
+    // For now, just set loading to false since we don't have a rideId
+    setIsLoading(false);
+  }, [rideId]);
 
   // ── Broadcast own GPS location ────────────────────────────────────────────
   const broadcastLocation = useCallback(() => {
@@ -327,12 +386,23 @@ export default function TrackingMap() {
     destCoords?.lng,
   ]);
 
-  // ── Google Maps navigation link ─────────────────────────────────────
-  const googleMapsUrl = destCoords
+  // ── Google Maps navigation links ──────────────────────────────────────────
+  // For pickup location (when ride is accepted)
+  const pickupNavUrl = pickupCoords
+    ? `https://www.google.com/maps/dir/?api=1&destination=${pickupCoords.lat},${pickupCoords.lng}&travelmode=driving`
+    : pickup
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(pickup)}`
+      : null;
+
+  // For destination (when ride is in-progress)
+  const destinationNavUrl = destCoords
     ? `https://www.google.com/maps/dir/?api=1&destination=${destCoords.lat},${destCoords.lng}&travelmode=driving`
     : destination
       ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destination)}`
       : null;
+
+  // Determine current navigation target based on ride status
+  const currentNavUrl = rideStatus === "in-progress" ? destinationNavUrl : pickupNavUrl;
 
   // ── Rider status change handler ───────────────────────────────────────────
   const handleStatusChange = useCallback(async (newStatus) => {
@@ -354,6 +424,42 @@ export default function TrackingMap() {
       setIsUpdatingStatus(false);
     }
   }, [rideId, isUpdatingStatus, navigate]);
+
+  // ── Cancel ride handler ───────────────────────────────────────────────────
+  const handleCancelRide = useCallback(async () => {
+    if (!window.confirm("Are you sure you want to cancel this ride?")) {
+      return;
+    }
+
+    if (isUpdatingStatus) return;
+    setIsUpdatingStatus(true);
+    try {
+      // Update ride status to cancelled
+      setRideStatus("cancelled");
+      if (socketRef.current?.connected) {
+        socketRef.current.emit("ride-status-change", { rideId, status: "cancelled" });
+      }
+      
+      // Persist to backend
+      await riderAPI.updateRideStatus(rideId, "cancelled").catch((e) =>
+        console.warn("Cancel failed:", e)
+      );
+      
+      // Clear sessionStorage and redirect
+      sessionStorage.removeItem('currentRideTracking');
+      setTimeout(() => {
+        if (role === "rider") {
+          navigate("/rider/dashboard");
+        } else {
+          navigate("/ride-search");
+        }
+      }, 1500);
+    } catch (error) {
+      console.error("Error cancelling ride:", error);
+      alert("Failed to cancel ride: " + error.message);
+      setIsUpdatingStatus(false);
+    }
+  }, [rideId, isUpdatingStatus, navigate, role]);
 
   const otherLabel = role === "rider" ? "Passenger" : "Rider";
 
@@ -381,6 +487,15 @@ export default function TrackingMap() {
       scale,
     };
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen gap-4 bg-slate-50">
+        <Loader className="w-8 h-8 text-blue-500 animate-spin" />
+        <p className="text-lg font-semibold text-slate-700">Loading ride details...</p>
+      </div>
+    );
+  }
 
   if (!rideId) {
     return (
@@ -417,17 +532,17 @@ export default function TrackingMap() {
             </span>
           </div>
 
-          {/* Right: navigate button (in-progress) or connection status */}
+          {/* Right: navigate button or connection status */}
           <div className="flex items-center gap-3">
-            {rideStatus === "in-progress" && googleMapsUrl && (
+            {(rideStatus === "accepted" || rideStatus === "in-progress") && currentNavUrl && (
               <a
-                href={googleMapsUrl}
+                href={currentNavUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white rounded-xl bg-linear-to-r from-blue-600 to-purple-600 hover:opacity-90 transition"
               >
                 <Navigation className="w-3.5 h-3.5" />
-                Navigate
+                {rideStatus === "accepted" ? "Go to Pickup" : "Navigate"}
                 <ExternalLink className="w-3 h-3 opacity-70" />
               </a>
             )}
@@ -735,11 +850,35 @@ export default function TrackingMap() {
             </div>
           )}
 
+          {/* ── Cancel ride button (for both passenger and rider) ────────────────── */}
+          {rideStatus !== "completed" && (
+            <button
+              onClick={handleCancelRide}
+              disabled={isUpdatingStatus}
+              className="w-full flex items-center justify-center gap-2 py-3 mt-3 text-sm font-bold text-red-600 transition rounded-2xl border-2 border-red-200 hover:bg-red-50 disabled:opacity-60 active:scale-95"
+            >
+              {isUpdatingStatus ? (
+                <Loader className="w-4 h-4 animate-spin" />
+              ) : (
+                <AlertCircle className="w-4 h-4" />
+              )}
+              Cancel Ride
+            </button>
+          )}
+
           {/* Ride completed banner */}
           {rideStatus === "completed" && (
             <div className="flex items-center justify-center gap-2 py-3 mt-3 border rounded-2xl bg-linear-to-r from-emerald-50 to-teal-50 border-emerald-200">
               <CheckCircle className="w-5 h-5 text-emerald-500" />
               <span className="text-sm font-bold text-emerald-700">Ride Completed!</span>
+            </div>
+          )}
+
+          {/* Ride cancelled banner */}
+          {rideStatus === "cancelled" && (
+            <div className="flex items-center justify-center gap-2 py-3 mt-3 border rounded-2xl bg-linear-to-r from-red-50 to-orange-50 border-red-200">
+              <AlertCircle className="w-5 h-5 text-red-500" />
+              <span className="text-sm font-bold text-red-700">Ride Cancelled</span>
             </div>
           )}
         </div>

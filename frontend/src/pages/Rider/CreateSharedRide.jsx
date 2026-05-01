@@ -56,14 +56,24 @@ export default function CreateSharedRide() {
       setLoading(true);
       setError(null);
 
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const token = sessionStorage.getItem('riderToken');
+
+      if (!token) {
+        throw new Error('Authentication token not found. Please login first.');
+      }
+
+      console.log('Creating shared ride with URL:', `${apiUrl}/api/rides/shared/create`);
+      console.log('Token present:', !!token);
+
       // Create ride via API
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/rides/shared/create`,
+        `${apiUrl}/api/rides/shared/create`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${sessionStorage.getItem('riderToken')}`
+            'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({
             ...formData,
@@ -74,8 +84,8 @@ export default function CreateSharedRide() {
       );
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Failed to create ride');
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || data.message || `Server error: ${response.status}`);
       }
 
       const data = await response.json();

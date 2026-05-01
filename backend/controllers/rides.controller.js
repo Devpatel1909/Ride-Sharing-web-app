@@ -919,3 +919,130 @@ exports.updatePassengerStatus = async (req, res) => {
     res.status(500).json({ error: 'Failed to update passenger status' });
   }
 };
+
+// Create a shared ride (for riders)
+exports.createSharedRide = async (req, res) => {
+  const client = await pool.connect();
+  try {
+    console.log('[SharedRide] Request received');
+    console.log('[SharedRide] req.rider:', req.rider);
+    
+    const riderId = req.rider?.riderId;
+    
+    if (!riderId) {
+      console.log('[SharedRide] Missing riderId');
+      return res.status(401).json({ error: 'Unauthorized - rider login required' });
+    }
+
+    console.log('[SharedRide] Rider ID:', riderId);
+
+    const {
+      pickupLocation,
+      dropoffLocation,
+      pickupTime,
+      vehicleType,
+      estimatedFare,
+      maxPassengers,
+      description,
+      pickupLat,
+      pickupLng,
+      dropoffLat,
+      dropoffLng
+    } = req.body;
+
+    console.log('[SharedRide] Request body:', {
+      pickupLocation,
+      dropoffLocation,
+      pickupTime,
+      vehicleType,
+      estimatedFare,
+      maxPassengers
+    });
+
+    // Validation
+    if (!pickupLocation || !dropoffLocation || !pickupTime || !estimatedFare || !maxPassengers) {
+      console.log('[SharedRide] Validation failed - missing required fields');
+      return res.status(400).json({
+        error: 'Missing required fields: pickupLocation, dropoffLocation, pickupTime, estimatedFare, maxPassengers'
+      });
+    }
+
+    if (maxPassengers < 1 || maxPassengers > 5) {
+      console.log('[SharedRide] Validation failed - invalid maxPassengers:', maxPassengers);
+      return res.status(400).json({
+        error: 'Maximum passengers must be between 1 and 5'
+      });
+    }
+
+    const numericFare = parseFloat(estimatedFare);
+    if (!Number.isFinite(numericFare) || numericFare <= 0) {
+      console.log('[SharedRide] Validation failed - invalid fare:', estimatedFare);
+      return res.status(400).json({ error: 'Invalid estimated fare amount' });
+    }
+
+    await client.query('BEGIN');
+
+    // Insert the shared ride
+    const insertQuery = `
+      INSERT INTO rides 
+      (rider_id, pickup_location, destination, ride_type, vehicle_type, fare, 
+       status, max_passengers, current_passengers, requested_at)
+      VALUES ($1, $2, $3, 'shared', $4, $5, 'pending', $6, 1, CURRENT_TIMESTAMP)
+      RETURNING id
+    `;
+
+    console.log('[SharedRide] Executing insert query with params:', [
+      riderId,
+      pickupLocation,
+      dropoffLocation,
+      vehicleType || 'sedan',
+      numericFare,
+      maxPassengers
+    ]);
+
+    const insertResult = await client.query(insertQuery, [
+      riderId,
+      pickupLocation,
+      dropoffLocation,
+      vehicleType || 'sedan',
+      numericFare,
+      maxPassengers
+    ]);
+
+    const rideId = insertResult.rows[0].id;
+    console.log('[SharedRide] Ride created with ID:', rideId);
+
+    await client.query('COMMIT');
+
+    clearResponseCache('shared-rides:');
+    clearResponseCache('ride-details:');
+
+    console.log('[SharedRide] Successfully created shared ride');
+
+    res.status(201).json({
+      success: true,
+      message: 'Shared ride created successfully',
+      ride: {
+        rideId,
+        riderId,
+        pickupLocation,
+        dropoffLocation,
+        pickupTime,
+        vehicleType: vehicleType || 'sedan',
+        estimatedFare: numericFare,
+        maxPassengers,
+        currentPassengers: 1,
+        status: 'pending',
+        description
+      }
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK').catch(e => console.error('Rollback error:', e));
+    console.error('[SharedRide] Error creating shared ride:', error);
+    console.error('[SharedRide] Error stack:', error.stack);
+    res.status(500).json({ error: 'Failed to create shared ride: ' + error.message });
+  } finally {
+    client.release();
+  }
+};
