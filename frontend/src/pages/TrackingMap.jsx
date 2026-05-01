@@ -747,9 +747,9 @@ export default function TrackingMap() {
           )}
 
           {/* ── Navigate to destination button (both rider & passenger when in-progress) ── */}
-          {rideStatus === "in-progress" && googleMapsUrl && (
+          {rideStatus === "in-progress" && destinationNavUrl && (
             <a
-              href={googleMapsUrl}
+              href={destinationNavUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 py-3 mt-3 text-sm font-bold text-white transition shadow-lg rounded-2xl bg-linear-to-r from-blue-600 via-indigo-600 to-purple-700 shadow-blue-500/30 hover:opacity-90 active:scale-95"
